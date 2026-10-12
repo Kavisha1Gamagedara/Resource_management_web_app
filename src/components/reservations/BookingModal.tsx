@@ -57,9 +57,11 @@ export function BookingModal({
       setEndTimeStr(format(initialEnd, "HH:mm"));
     } else {
       const now = new Date();
+      const nextHour = Math.min(now.getHours() + 1, 22);
+      const nextHourEnd = Math.min(nextHour + 1, 23);
       setDateStr(format(now, "yyyy-MM-dd"));
-      setStartTimeStr("10:00");
-      setEndTimeStr("11:00");
+      setStartTimeStr(`${String(nextHour).padStart(2, "0")}:00`);
+      setEndTimeStr(`${String(nextHourEnd).padStart(2, "0")}:00`);
     }
     setTitle("");
     setNotes("");
@@ -80,6 +82,11 @@ export function BookingModal({
 
     if (end <= start) {
       setConflictWarning("End time must be later than start time.");
+      return;
+    }
+
+    if (start.getTime() < Date.now() - 60 * 1000) {
+      setConflictWarning("Cannot reserve a slot in the past. Please select an upcoming date and time.");
       return;
     }
 
@@ -245,6 +252,7 @@ export function BookingModal({
               <input
                 type="date"
                 required
+                min={format(new Date(), "yyyy-MM-dd")}
                 value={dateStr}
                 onChange={(e) => setDateStr(e.target.value)}
                 className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 pl-9 pr-3 text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
@@ -263,6 +271,7 @@ export function BookingModal({
                 <input
                   type="time"
                   required
+                  min={dateStr === format(new Date(), "yyyy-MM-dd") ? format(new Date(), "HH:mm") : undefined}
                   value={startTimeStr}
                   onChange={(e) => setStartTimeStr(e.target.value)}
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 pl-9 pr-3 text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
@@ -279,6 +288,7 @@ export function BookingModal({
                 <input
                   type="time"
                   required
+                  min={startTimeStr || undefined}
                   value={endTimeStr}
                   onChange={(e) => setEndTimeStr(e.target.value)}
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 pl-9 pr-3 text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
@@ -286,6 +296,15 @@ export function BookingModal({
               </div>
             </div>
           </div>
+
+          {dateStr === format(new Date(), "yyyy-MM-dd") && (
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 -mt-1">
+              <Clock className="h-3 w-3 text-teal-600 dark:text-teal-400 shrink-0" />
+              <span>
+                Booking for today: Only future slots passing current time ({format(new Date(), "h:mm a")}) can be reserved.
+              </span>
+            </p>
+          )}
 
           {/* Notes */}
           <div>

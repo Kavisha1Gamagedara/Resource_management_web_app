@@ -30,6 +30,17 @@ export const reservationSchema = z
       message: "Reservation duration must be at least 15 minutes",
       path: ["endTime"],
     }
+  )
+  .refine(
+    (data) => {
+      // Must not be in the past (allow 2 minute grace period for submission network delay)
+      const gracePeriodMs = 2 * 60 * 1000;
+      return data.startTime.getTime() >= Date.now() - gracePeriodMs;
+    },
+    {
+      message: "Cannot reserve a resource in the past. Please select an upcoming date and time.",
+      path: ["startTime"],
+    }
   );
 
 export type ReservationInput = z.infer<typeof reservationSchema>;

@@ -1,0 +1,324 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { format, setHours, setMinutes } from "date-fns";
+import {
+  X,
+  Clock,
+  Calendar,
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  FileText,
+  Building2,
+} from "lucide-react";
+import { updateReservation, checkLiveConflict } from "@/lib/actions/reservations";
+
+interface ReservationToEdit {
+  id: string;
+  title: string;
+  notes?: string | null;
+  startTime: Date | string;
+  endTime: Date | string;
+  resourceId: string;
+  resource: {
+    name: string;
+    location: string;
+  };
+}
+
+interface EditReservationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  reservation: ReservationToEdit | null;
+  onSuccess: (updated: any) => void;
+}
+
+export function EditReservationModal({
+  isOpen,
+  onClose,
+  reservation,
+  onSuccess,
+}: EditReservationModalProps) {
+  const [title, setTitle] = useState("");
+  const [dateStr, setDateStr] = useState("");
+  const [startTimeStr, setStartTimeStr] = useState("10:00");
+  const [endTimeStr, setEndTimeStr] = useState("11:00");
+  const [notes, setNotes] = useState("");
+
+  const [conflictWarning, setConflictWarning] = useState<string | null>(null);
+  const [isCheckingConflict, setIsCheckingConflict] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (reservation) {
+      const start = new Date(reservation.startTime);
+      const end = new Date(reservation.endTime);
+
+      setTitle(reservation.title);
+      setDateStr(format(start, "yyyy-MM-dd"));
+      setStartTimeStr(format(start, "HH:mm"));
+      setEndTimeStr(format(end, "HH:mm"));
+      setNotes(reservation.notes || "");
+      setConflictWarning(null);
+      setError(null);
+    }
+  }, [reservation, isOpen]);
+
+  // Debounced live conflict checking with self-exclusion
+  useEffect(() => {
+    if (!isOpen || !reservation || !dateStr || !startTimeStr || !endTimeStr) return;
+
+    const [startH, startM] = startTimeStr.split(":").map(Number);
+    const [endH, endM] = endTimeStr.split(":").map(Number);
+
+    const baseDate = new Date(`${dateStr}T00:00:00`);
+    const start = setMinutes(setHours(baseDate, startH), startM);
+    const end = setMinutes(setHours(baseDate, endH), endM);
+
+    if (end <= start) {
+      setConflictWarning("End time must be later than start time.");
+      return;
+    }
+
+    if (start.getTime() < Date.now() - 60 * 1000) {
+      setConflictWarning("Cannot set reservation to a time in the past. Please select an upcoming date and time.");
+      return;
+    }
+
+    setIsCheckingConflict(true);
+    const timer = setTimeout(async () => {
+      const res = await checkLiveConflict({
+        resourceId: reservation.resourceId,
+        startTime: start,
+        endTime: end,
+        excludeReservationId: reservation.id, // Self-exclusion!
+      });
+      setIsCheckingConflict(false);
+
+      if (res.hasConflict && res.message) {
+        setConflictWarning(res.message);
+      } else {
+        setConflictWarning(null);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [isOpen, dateStr, startTimeStr, endTimeStr, reservation]);
+
+  if (!isOpen || !reservation) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (conflictWarning) {
+      setError("Cannot update: Please resolve the scheduling conflict first.");
+      return;
+    }
+
+    const [startH, startM] = startTimeStr.split(":").map(Number);
+    const [endH, endM] = endTimeStr.split(":").map(Number);
+
+    const baseDate = new Date(`${dateStr}T00:00:00`);
+    const start = setMinutes(setHours(baseDate, startH), startM);
+    const end = setMinutes(setHours(baseDate, endH), endM);
+
+    setIsSubmitting(true);
+
+    try {
+      const result = await updateReservation(reservation.id, {
+        resourceId: reservation.resourceId,
+        title: title.trim(),
+        notes: notes.trim() || null,
+        startTime: start,
+        endTime: end,
+      });
+
+      setIsSubmitting(false);
+
+      if (result.success && result.reservation) {
+        onSuccess(result.reservation);
+        onClose();
+      } else {
+        setError(result.error || "Update failed.");
+      }
+    } catch (err: any) {
+      setIsSubmitting(false);
+      setError(err?.message || "An unexpected error occurred.");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 overflow-y-auto max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-4">
+          <div>
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+              Edit Reservation
+            </h3>
+            <p className="text-xs text-zinc-500">
+              {reservation.resource.name} • {reservation.resource.location}
+            </p>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="rounded-xl p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Conflict Warning */}
+        {conflictWarning && (
+          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-300">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
+              <div>
+                <span className="font-bold">Time Conflict Detected</span>
+                <p className="mt-0.5 leading-relaxed">{conflictWarning}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Slot Available Indicator */}
+        {!conflictWarning && !isCheckingConflict && (
+          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+            <span>Updated time slot is free! (Self-exclusion active)</span>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4 text-xs">
+          {/* Title */}
+          <div>
+            <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              Meeting / Purpose Title *
+            </label>
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 p-2.5 text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
+            />
+          </div>
+
+          {/* Date Picker */}
+          <div>
+            <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              Reservation Date *
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
+              <input
+                type="date"
+                required
+                min={format(new Date(), "yyyy-MM-dd")}
+                value={dateStr}
+                onChange={(e) => setDateStr(e.target.value)}
+                className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 pl-9 pr-3 text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
+              />
+            </div>
+          </div>
+
+          {/* Time Pickers */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Start Time *
+              </label>
+              <div className="relative">
+                <Clock className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
+                <input
+                  type="time"
+                  required
+                  min={dateStr === format(new Date(), "yyyy-MM-dd") ? format(new Date(), "HH:mm") : undefined}
+                  value={startTimeStr}
+                  onChange={(e) => setStartTimeStr(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 pl-9 pr-3 text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                End Time *
+              </label>
+              <div className="relative">
+                <Clock className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
+                <input
+                  type="time"
+                  required
+                  min={startTimeStr || undefined}
+                  value={endTimeStr}
+                  onChange={(e) => setEndTimeStr(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 pl-9 pr-3 text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
+                />
+              </div>
+            </div>
+          </div>
+
+          {dateStr === format(new Date(), "yyyy-MM-dd") && (
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 -mt-1">
+              <Clock className="h-3 w-3 text-teal-600 dark:text-teal-400 shrink-0" />
+              <span>
+                Rescheduling for today: Must select an upcoming time slot passing current time ({format(new Date(), "h:mm a")}).
+              </span>
+            </p>
+          )}
+
+          {/* Notes */}
+          <div>
+            <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              Notes (Optional)
+            </label>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 p-2.5 text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="rounded-xl border border-zinc-200 px-4 py-2 font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 transition-colors"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={isSubmitting || Boolean(conflictWarning)}
+              className="flex items-center gap-2 rounded-xl bg-teal-600 px-5 py-2 font-semibold text-white shadow-sm hover:bg-teal-500 disabled:opacity-50 transition-all"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Updating...</span>
+                </>
+              ) : (
+                <span>Save Changes</span>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

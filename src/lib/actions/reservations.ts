@@ -214,6 +214,14 @@ export async function checkLiveConflict(params: {
       return { hasConflict: false };
     }
 
+    // Validate that start time is not in the past
+    if (start.getTime() < Date.now() - 60 * 1000) {
+      return {
+        hasConflict: true,
+        message: "Cannot reserve slots in the past. Please select an upcoming date and time.",
+      };
+    }
+
     const conflict = await findConflict(prisma, {
       resourceId: params.resourceId,
       startTime: start,
