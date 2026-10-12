@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Edit3,
   Power,
@@ -49,6 +50,7 @@ export function AdminResourceTable({
   initialResources,
   categories,
 }: AdminResourceTableProps) {
+  const router = useRouter();
   const [resources, setResources] = useState<ResourceItem[]>(initialResources);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -370,13 +372,29 @@ export function AdminResourceTable({
         onClose={() => setModalOpen(false)}
         categories={categories}
         resourceToEdit={resourceToEdit}
-        onSuccess={() => {
-          showNotification(
-            "success",
-            resourceToEdit
-              ? "Resource updated successfully!"
-              : "New resource created successfully!"
-          );
+        onSuccess={(savedResource) => {
+          if (savedResource) {
+            const formatted: ResourceItem = {
+              ...savedResource,
+              _count: savedResource._count || { reservations: 0 },
+            };
+            if (resourceToEdit) {
+              setResources((prev) =>
+                prev.map((r) => (r.id === formatted.id ? formatted : r))
+              );
+              showNotification(
+                "success",
+                `"${formatted.name}" updated successfully!`
+              );
+            } else {
+              setResources((prev) => [formatted, ...prev]);
+              showNotification(
+                "success",
+                `"${formatted.name}" created successfully and added to catalog!`
+              );
+            }
+          }
+          router.refresh();
         }}
       />
     </div>

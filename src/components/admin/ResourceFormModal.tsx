@@ -37,7 +37,7 @@ interface ResourceFormModalProps {
   onClose: () => void;
   categories: Category[];
   resourceToEdit?: ResourceToEdit | null;
-  onSuccess?: () => void;
+  onSuccess?: (resource: any) => void;
 }
 
 export function ResourceFormModal({
@@ -136,7 +136,7 @@ export function ResourceFormModal({
       if (result.success) {
         setIsLoading(false);
         onClose();
-        if (onSuccess) onSuccess();
+        if (onSuccess) onSuccess(result.resource);
       } else {
         setError(result.error || "An error occurred.");
         setIsLoading(false);

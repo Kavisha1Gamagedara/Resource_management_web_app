@@ -24,6 +24,9 @@ export async function createResource(input: ResourceInput) {
       },
       include: {
         category: true,
+        _count: {
+          select: { reservations: true },
+        },
       },
     });
 
@@ -62,6 +65,9 @@ export async function updateResource(id: string, input: ResourceInput) {
       },
       include: {
         category: true,
+        _count: {
+          select: { reservations: true },
+        },
       },
     });
 
