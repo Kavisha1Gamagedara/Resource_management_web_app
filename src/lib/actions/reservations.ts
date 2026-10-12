@@ -2,10 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/db";
-import { requireAuth, getCurrentUser } from "@/lib/auth";
+import { requireAuth, requireAdmin, getCurrentUser } from "@/lib/auth";
 import { reservationSchema, ReservationInput } from "@/lib/validations/reservation";
 import { findConflict, formatConflictMessage } from "@/lib/booking-engine";
-import { ResourceStatus, ReservationStatus } from "@prisma/client";
+import { ResourceStatus, ReservationStatus, Role } from "@prisma/client";
 
 /**
  * Story 3: Atomic reservation creation with transactional conflict prevention
@@ -31,7 +31,7 @@ export async function createReservation(input: ReservationInput) {
         );
       }
 
-      // 2. Query for overlapping CONFIRMED reservations
+      // 2. Query for overlapping CONFIRMED or PENDING reservations
       const conflict = await findConflict(tx, {
         resourceId: validatedData.resourceId,
         startTime: validatedData.startTime,
@@ -42,6 +42,14 @@ export async function createReservation(input: ReservationInput) {
         throw new Error(formatConflictMessage(conflict));
       }
 
+      // If user marks as private, it requires Admin approval (PENDING status)
+      // Admins creating private reservations can be immediately confirmed
+      const isPrivate = Boolean(validatedData.isPrivate);
+      const initialStatus =
+        isPrivate && user.role !== Role.ADMIN
+          ? ReservationStatus.PENDING
+          : ReservationStatus.CONFIRMED;
+
       // 3. Atomically create the reservation
       return await tx.reservation.create({
         data: {
@@ -51,7 +59,8 @@ export async function createReservation(input: ReservationInput) {
           endTime: validatedData.endTime,
           resourceId: validatedData.resourceId,
           userId: user.id,
-          status: ReservationStatus.CONFIRMED,
+          status: initialStatus,
+          isPrivate,
         },
         include: {
           resource: true,
@@ -61,6 +70,7 @@ export async function createReservation(input: ReservationInput) {
     });
 
     revalidatePath("/");
+    revalidatePath("/admin");
     revalidatePath("/resources");
     revalidatePath(`/resources/${validatedData.resourceId}`);
     revalidatePath("/reservations");
@@ -182,6 +192,7 @@ export async function cancelReservation(id: string) {
     });
 
     revalidatePath("/");
+    revalidatePath("/admin");
     revalidatePath("/resources");
     revalidatePath(`/resources/${cancelled.resourceId}`);
     revalidatePath("/reservations");
@@ -193,6 +204,96 @@ export async function cancelReservation(id: string) {
     return {
       success: false,
       error: error?.message || "Failed to cancel reservation.",
+    };
+  }
+}
+
+/**
+ * Admin Action: Approve a pending private reservation
+ */
+export async function approveReservation(id: string, adminNotes?: string) {
+  try {
+    await requireAdmin();
+    if (!id) throw new Error("Reservation ID is required.");
+
+    const existing = await prisma.reservation.findUnique({
+      where: { id },
+      include: { resource: true, user: true },
+    });
+
+    if (!existing) {
+      throw new Error("Reservation not found.");
+    }
+
+    if (existing.status !== ReservationStatus.PENDING) {
+      throw new Error(`Reservation is already ${existing.status.toLowerCase()}.`);
+    }
+
+    const updated = await prisma.reservation.update({
+      where: { id },
+      data: {
+        status: ReservationStatus.CONFIRMED,
+        adminNotes: adminNotes?.trim() || null,
+      },
+      include: { resource: true, user: true },
+    });
+
+    revalidatePath("/");
+    revalidatePath("/admin");
+    revalidatePath("/resources");
+    revalidatePath(`/resources/${updated.resourceId}`);
+    revalidatePath("/reservations");
+    revalidatePath("/my-reservations");
+
+    return { success: true, reservation: updated };
+  } catch (error: any) {
+    console.error("Approve reservation error:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to approve reservation.",
+    };
+  }
+}
+
+/**
+ * Admin Action: Decline a pending private reservation, immediately freeing up the slot
+ */
+export async function declineReservation(id: string, adminNotes?: string) {
+  try {
+    await requireAdmin();
+    if (!id) throw new Error("Reservation ID is required.");
+
+    const existing = await prisma.reservation.findUnique({
+      where: { id },
+      include: { resource: true, user: true },
+    });
+
+    if (!existing) {
+      throw new Error("Reservation not found.");
+    }
+
+    const updated = await prisma.reservation.update({
+      where: { id },
+      data: {
+        status: ReservationStatus.DECLINED,
+        adminNotes: adminNotes?.trim() || null,
+      },
+      include: { resource: true, user: true },
+    });
+
+    revalidatePath("/");
+    revalidatePath("/admin");
+    revalidatePath("/resources");
+    revalidatePath(`/resources/${updated.resourceId}`);
+    revalidatePath("/reservations");
+    revalidatePath("/my-reservations");
+
+    return { success: true, reservation: updated };
+  } catch (error: any) {
+    console.error("Decline reservation error:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to decline reservation.",
     };
   }
 }

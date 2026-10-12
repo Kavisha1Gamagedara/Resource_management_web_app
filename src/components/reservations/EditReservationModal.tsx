@@ -11,6 +11,7 @@ import {
   Loader2,
   FileText,
   Building2,
+  Lock,
 } from "lucide-react";
 import { updateReservation, checkLiveConflict } from "@/lib/actions/reservations";
 
@@ -21,6 +22,7 @@ interface ReservationToEdit {
   startTime: Date | string;
   endTime: Date | string;
   resourceId: string;
+  isPrivate?: boolean;
   resource: {
     name: string;
     location: string;
@@ -45,6 +47,7 @@ export function EditReservationModal({
   const [startTimeStr, setStartTimeStr] = useState("10:00");
   const [endTimeStr, setEndTimeStr] = useState("11:00");
   const [notes, setNotes] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
 
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const [isCheckingConflict, setIsCheckingConflict] = useState(false);
@@ -61,6 +64,7 @@ export function EditReservationModal({
       setStartTimeStr(format(start, "HH:mm"));
       setEndTimeStr(format(end, "HH:mm"));
       setNotes(reservation.notes || "");
+      setIsPrivate(Boolean(reservation.isPrivate));
       setConflictWarning(null);
       setError(null);
     }
@@ -134,6 +138,7 @@ export function EditReservationModal({
         notes: notes.trim() || null,
         startTime: start,
         endTime: end,
+        isPrivate,
       });
 
       setIsSubmitting(false);
@@ -289,6 +294,27 @@ export function EditReservationModal({
               onChange={(e) => setNotes(e.target.value)}
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 p-2.5 text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
             />
+          </div>
+
+          {/* Private Toggle */}
+          <div className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-3.5 dark:border-amber-900/50 dark:bg-amber-950/20">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500 dark:border-amber-700 dark:bg-zinc-900"
+              />
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950 dark:text-amber-200">
+                  <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>Mark as Private Reservation</span>
+                </div>
+                <p className="text-[11px] text-amber-900/80 dark:text-amber-300/80 leading-relaxed">
+                  Meeting title and notes remain confidential. Non-admin colleagues will only see that this slot is occupied.
+                </p>
+              </div>
+            </label>
           </div>
 
           {/* Actions */}

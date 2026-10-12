@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { Badge } from "@/components/ui/Badge";
 import { AdminResourceTable } from "@/components/admin/AdminResourceTable";
+import { PendingApprovalsSection } from "@/components/admin/PendingApprovalsSection";
 import {
   ShieldAlert,
   ShieldCheck,
@@ -71,8 +72,8 @@ export default async function AdminDashboardPage() {
     );
   }
 
-  // User is verified ADMIN: Query all resources for administration
-  const [resources, categories] = await Promise.all([
+  // User is verified ADMIN: Query all resources and pending private reservations
+  const [resources, categories, pendingReservations] = await Promise.all([
     prisma.resource.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -84,6 +85,26 @@ export default async function AdminDashboardPage() {
     }),
     prisma.category.findMany({
       orderBy: { name: "asc" },
+    }),
+    prisma.reservation.findMany({
+      where: {
+        status: "PENDING",
+      },
+      include: {
+        resource: {
+          include: { category: true },
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            department: true,
+            avatarUrl: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
     }),
   ]);
 
@@ -155,6 +176,9 @@ export default async function AdminDashboardPage() {
           <span className="text-[11px] text-zinc-400">Soft-deactivated items</span>
         </div>
       </div>
+
+      {/* Pending Private Approvals (Requires Admin Review) */}
+      <PendingApprovalsSection initialPending={pendingReservations as any} />
 
       {/* Interactive Resources Management Table */}
       <AdminResourceTable initialResources={resources} categories={categories} />

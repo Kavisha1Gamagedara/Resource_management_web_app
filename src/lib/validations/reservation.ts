@@ -10,6 +10,7 @@ export const reservationSchema = z
     notes: z.string().max(500, "Notes cannot exceed 500 characters").optional().nullable(),
     startTime: z.coerce.date({ message: "Invalid start time format" }),
     endTime: z.coerce.date({ message: "Invalid end time format" }),
+    isPrivate: z.boolean().default(false),
   })
   .refine(
     (data) => {

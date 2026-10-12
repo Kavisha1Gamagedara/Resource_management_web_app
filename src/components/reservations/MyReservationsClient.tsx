@@ -29,7 +29,9 @@ interface ReservationItem {
   notes?: string | null;
   startTime: Date | string;
   endTime: Date | string;
-  status: "CONFIRMED" | "CANCELLED" | "COMPLETED";
+  status: string;
+  isPrivate?: boolean;
+  adminNotes?: string | null;
   resourceId: string;
   resource: {
     id: string;
@@ -78,11 +80,11 @@ export function MyReservationsClient({
 
     // 1. Tab match
     if (activeTab === "UPCOMING") {
-      if (r.status !== "CONFIRMED" || rEnd < now) return false;
+      if ((r.status !== "CONFIRMED" && r.status !== "PENDING") || rEnd < now) return false;
     } else if (activeTab === "PAST") {
-      if (r.status === "CANCELLED" || rEnd >= now) return false;
+      if (r.status === "CANCELLED" || r.status === "DECLINED" || rEnd >= now) return false;
     } else if (activeTab === "CANCELLED") {
-      if (r.status !== "CANCELLED") return false;
+      if (r.status !== "CANCELLED" && r.status !== "DECLINED") return false;
     }
 
     // 2. Search match
@@ -270,18 +272,33 @@ export function MyReservationsClient({
                       </span>
                     )}
 
-                    <Badge
-                      variant={
-                        isCancelled
-                          ? "neutral"
-                          : isPast
-                          ? "neutral"
-                          : "success"
-                      }
-                      size="sm"
-                    >
-                      {item.status}
-                    </Badge>
+                    <div className="flex items-center gap-1.5">
+                      {item.isPrivate && (
+                        <Badge variant="purple" size="sm">
+                          🔒 Private
+                        </Badge>
+                      )}
+                      <Badge
+                        variant={
+                          item.status === "PENDING"
+                            ? "warning"
+                            : item.status === "DECLINED"
+                            ? "danger"
+                            : isCancelled
+                            ? "neutral"
+                            : isPast
+                            ? "neutral"
+                            : "success"
+                        }
+                        size="sm"
+                      >
+                        {item.status === "PENDING"
+                          ? "Pending Approval"
+                          : item.status === "DECLINED"
+                          ? "Declined"
+                          : item.status}
+                      </Badge>
+                    </div>
                   </div>
 
                   {/* Title & Resource */}

@@ -179,6 +179,53 @@ async function runTests() {
     });
     assert(!pastValidation.success, "Test 9: Past Time Booking Rejection", "Past reservation correctly rejected by schema");
 
+    // 10. Pending Private Reservation Holds Slot (Privacy & Approval Workflow)
+    const privateSlotStart = new Date(testDay);
+    privateSlotStart.setHours(14, 0, 0, 0); // 2:00 PM
+    const privateSlotEnd = new Date(testDay);
+    privateSlotEnd.setHours(15, 0, 0, 0);   // 3:00 PM
+
+    const pendingPrivateBooking = await prisma.reservation.create({
+      data: {
+        title: "Confidential Project Brief",
+        resourceId: testResource.id,
+        userId: user.id,
+        startTime: privateSlotStart,
+        endTime: privateSlotEnd,
+        status: ReservationStatus.PENDING,
+        isPrivate: true,
+      },
+    });
+
+    // Attempt to book the exact same slot while pending approval
+    const conflictPending = await findConflict(prisma, {
+      resourceId: testResource.id,
+      startTime: privateSlotStart,
+      endTime: privateSlotEnd,
+    });
+    assert(
+      conflictPending !== null && conflictPending.status === ReservationStatus.PENDING,
+      "Test 10: Pending Private Reservation Holds Slot",
+      "Slot successfully held while pending administrator review"
+    );
+
+    // 11. Declined Reservation Frees Slot Immediately
+    await prisma.reservation.update({
+      where: { id: pendingPrivateBooking.id },
+      data: { status: ReservationStatus.DECLINED },
+    });
+
+    const conflictAfterDecline = await findConflict(prisma, {
+      resourceId: testResource.id,
+      startTime: privateSlotStart,
+      endTime: privateSlotEnd,
+    });
+    assert(
+      conflictAfterDecline === null,
+      "Test 11: Declined Reservation Releases Slot Immediately",
+      "Slot freed immediately after admin decline"
+    );
+
     // Cleanup test artifacts
     await prisma.reservation.deleteMany({
       where: { resourceId: testResource.id },

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useSession } from "next-auth/react";
 import {
   format,
   addDays,
@@ -21,6 +22,7 @@ import {
   Plus,
   AlertCircle,
   CheckCircle2,
+  Lock,
 } from "lucide-react";
 import { formatTime, formatTimeRange } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
@@ -33,6 +35,8 @@ interface Reservation {
   startTime: Date | string;
   endTime: Date | string;
   status: string;
+  isPrivate?: boolean;
+  userId?: string;
   user?: {
     name: string;
     department?: string | null;
@@ -52,6 +56,7 @@ export function AvailabilityTimeline({
   isResourceActive,
   reservations,
 }: AvailabilityTimelineProps) {
+  const { data: session } = useSession();
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [modalOpen, setModalOpen] = useState(false);
   const [prefilledSlot, setPrefilledSlot] = useState<{
@@ -59,10 +64,10 @@ export function AvailabilityTimeline({
     end: Date;
   } | null>(null);
 
-  // Filter reservations for the currently selected day
+  // Filter reservations for the currently selected day (include CONFIRMED and PENDING)
   const dailyReservations = reservations
     .filter((r) => {
-      if (r.status !== "CONFIRMED") return false;
+      if (r.status !== "CONFIRMED" && r.status !== "PENDING") return false;
       const rStart = new Date(r.startTime);
       const rEnd = new Date(r.endTime);
       return (
@@ -210,6 +215,10 @@ export function AvailabilityTimeline({
               <span>Booked Slot</span>
             </span>
             <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+              <span>Pending Approval (Held)</span>
+            </span>
+            <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-zinc-400" />
               <span>Past / Elapsed</span>
             </span>
@@ -240,20 +249,21 @@ export function AvailabilityTimeline({
                 const slotStart = setMinutes(setHours(selectedDate, hour), 0);
                 const slotEnd = setMinutes(setHours(selectedDate, hour + 1), 0);
 
-                // Check if slot overlaps any confirmed reservation
-                const isBooked = dailyReservations.some((r) => {
+                // Check if slot overlaps any confirmed or pending reservation
+                const overlappingRes = dailyReservations.find((r) => {
                   const rStart = new Date(r.startTime);
                   const rEnd = new Date(r.endTime);
                   return slotStart < rEnd && slotEnd > rStart;
                 });
 
-                // A slot is past if its start time has already elapsed
+                const isBooked = overlappingRes?.status === "CONFIRMED";
+                const isPending = overlappingRes?.status === "PENDING";
                 const isPast = slotStart.getTime() <= Date.now();
 
                 return (
                   <button
                     key={hour}
-                    disabled={!isResourceActive || isBooked || isPast}
+                    disabled={!isResourceActive || isBooked || isPending || isPast}
                     onClick={() => handleSlotClick(hour)}
                     className={`group relative flex flex-col items-center justify-center rounded-xl p-2.5 text-center transition-all ${
                       !isResourceActive
@@ -262,6 +272,8 @@ export function AvailabilityTimeline({
                         ? "bg-zinc-100/70 text-zinc-400 border border-zinc-200/50 cursor-not-allowed dark:bg-zinc-900/40 dark:text-zinc-600 dark:border-zinc-800"
                         : isBooked
                         ? "bg-rose-100 text-rose-800 border border-rose-200 cursor-not-allowed dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900"
+                        : isPending
+                        ? "bg-amber-100 text-amber-900 border border-amber-300 cursor-not-allowed dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800"
                         : "bg-white text-zinc-700 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 hover:shadow-sm border border-zinc-200 dark:bg-zinc-900 dark:text-zinc-300 dark:border-zinc-800 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-300 cursor-pointer"
                     }`}
                     title={
@@ -271,6 +283,8 @@ export function AvailabilityTimeline({
                         ? `Time has passed (${formatTime(slotStart)})`
                         : isBooked
                         ? `Booked (${formatTime(slotStart)})`
+                        : isPending
+                        ? `Pending Admin Approval (${formatTime(slotStart)} – ${formatTime(slotEnd)}) - Slot Held`
                         : `Click to reserve ${formatTime(slotStart)} – ${formatTime(slotEnd)}`
                     }
                   >
@@ -278,7 +292,7 @@ export function AvailabilityTimeline({
                       {hour > 12 ? `${hour - 12} PM` : hour === 12 ? "12 PM" : `${hour} AM`}
                     </span>
                     <span className="mt-1 text-[9px] font-medium leading-none">
-                      {isPast ? "Past" : isBooked ? "Booked" : "Free"}
+                      {isPast ? "Past" : isBooked ? "Booked" : isPending ? "Pending 🔒" : "Free"}
                     </span>
                   </button>
                 );
@@ -306,49 +320,73 @@ export function AvailabilityTimeline({
           </div>
         ) : (
           <div className="divide-y divide-zinc-100 rounded-2xl border border-zinc-200/80 bg-white overflow-hidden dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
-            {dailyReservations.map((res) => (
-              <div
-                key={res.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/40 transition-colors"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      {res.title}
-                    </span>
-                    <Badge variant="danger" size="sm">
-                      Booked
-                    </Badge>
-                  </div>
+            {dailyReservations.map((res) => {
+              const isOwner = session?.user?.id === res.userId;
+              const isAdmin = session?.user?.role === "ADMIN";
+              const displayTitle =
+                res.isPrivate && !isOwner && !isAdmin
+                  ? "🔒 Private Reservation"
+                  : res.title;
+              const displayNotes =
+                res.isPrivate && !isOwner && !isAdmin
+                  ? "Confidential details protected"
+                  : res.notes;
 
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                    <div className="flex items-center gap-1">
-                      <User className="h-3 w-3 text-zinc-400" />
-                      <span>{res.user?.name || "Team Member"}</span>
+              return (
+                <div
+                  key={res.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/40 transition-colors"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                        {displayTitle}
+                      </span>
+                      {res.status === "PENDING" ? (
+                        <Badge variant="warning" size="sm">
+                          Pending Approval
+                        </Badge>
+                      ) : (
+                        <Badge variant="danger" size="sm">
+                          Booked
+                        </Badge>
+                      )}
+                      {res.isPrivate && (
+                        <Badge variant="purple" size="sm">
+                          Private
+                        </Badge>
+                      )}
                     </div>
-                    {res.user?.department && (
-                      <>
-                        <span>•</span>
-                        <span>{res.user.department}</span>
-                      </>
-                    )}
-                    {res.notes && (
-                      <>
-                        <span>•</span>
-                        <span className="italic">"{res.notes}"</span>
-                      </>
-                    )}
+
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                      <div className="flex items-center gap-1">
+                        <User className="h-3 w-3 text-zinc-400" />
+                        <span>{res.user?.name || "Team Member"}</span>
+                      </div>
+                      {res.user?.department && (
+                        <>
+                          <span>•</span>
+                          <span>{res.user.department}</span>
+                        </>
+                      )}
+                      {displayNotes && (
+                        <>
+                          <span>•</span>
+                          <span className="italic">"{displayNotes}"</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 shrink-0">
+                    <Clock className="h-3.5 w-3.5 text-zinc-500" />
+                    <span>
+                      {formatTime(res.startTime)} – {formatTime(res.endTime)}
+                    </span>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-1.5 rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 shrink-0">
-                  <Clock className="h-3.5 w-3.5 text-zinc-500" />
-                  <span>
-                    {formatTime(res.startTime)} – {formatTime(res.endTime)}
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

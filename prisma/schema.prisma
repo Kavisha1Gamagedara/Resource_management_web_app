@@ -22,6 +22,8 @@ enum ReservationStatus {
   CONFIRMED
   CANCELLED
   COMPLETED
+  PENDING
+  DECLINED
 }
 
 model User {
@@ -74,6 +76,8 @@ model Reservation {
   startTime  DateTime
   endTime    DateTime
   status     ReservationStatus @default(CONFIRMED)
+  isPrivate  Boolean           @default(false)
+  adminNotes String?
   userId     String
   user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   resourceId String
@@ -84,4 +88,5 @@ model Reservation {
   @@index([resourceId, startTime, endTime])
   @@index([userId, startTime])
   @@index([status])
+  @@index([isPrivate])
 }

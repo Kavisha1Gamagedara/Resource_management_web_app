@@ -43,6 +43,7 @@ export function BookingModal({
   const [startTimeStr, setStartTimeStr] = useState("10:00");
   const [endTimeStr, setEndTimeStr] = useState("11:00");
   const [notes, setNotes] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
 
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const [isCheckingConflict, setIsCheckingConflict] = useState(false);
@@ -65,6 +66,7 @@ export function BookingModal({
     }
     setTitle("");
     setNotes("");
+    setIsPrivate(false);
     setConflictWarning(null);
     setSubmitError(null);
   }, [initialStart, initialEnd, isOpen]);
@@ -141,6 +143,7 @@ export function BookingModal({
         notes: notes.trim() || null,
         startTime: start,
         endTime: end,
+        isPrivate,
       });
 
       setIsSubmitting(false);
@@ -320,6 +323,27 @@ export function BookingModal({
             />
           </div>
 
+          {/* Mark as Private Reservation Toggle */}
+          <div className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-3.5 dark:border-amber-900/50 dark:bg-amber-950/20">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500 dark:border-amber-700 dark:bg-zinc-900"
+              />
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950 dark:text-amber-200">
+                  <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>Mark as Private Reservation (Requires Admin Approval)</span>
+                </div>
+                <p className="text-[11px] text-amber-900/80 dark:text-amber-300/80 leading-relaxed">
+                  When checked, this reservation is held as <strong>Pending Approval</strong> so no other user can book this slot while waiting for Admin review. The meeting title and notes are masked from other colleagues to protect confidentiality.
+                </p>
+              </div>
+            </label>
+          </div>
+
           {/* Actions */}
           <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-2">
             <button
@@ -337,6 +361,8 @@ export function BookingModal({
               className={`flex items-center gap-2 rounded-xl px-5 py-2 font-semibold text-white shadow-sm transition-all ${
                 conflictWarning
                   ? "bg-rose-500/80 cursor-not-allowed"
+                  : isPrivate && session?.user?.role !== "ADMIN"
+                  ? "bg-amber-600 hover:bg-amber-500 disabled:opacity-50"
                   : "bg-teal-600 hover:bg-teal-500 disabled:opacity-50"
               }`}
             >
@@ -347,6 +373,8 @@ export function BookingModal({
                 </>
               ) : conflictWarning ? (
                 <span>Cannot Book (Conflict)</span>
+              ) : isPrivate && session?.user?.role !== "ADMIN" ? (
+                <span>Request Private Slot (Pending Approval) 🔒</span>
               ) : (
                 <span>Confirm Reservation ⚡</span>
               )}

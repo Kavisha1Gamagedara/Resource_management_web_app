@@ -32,7 +32,9 @@ export async function findConflict(
   return await tx.reservation.findFirst({
     where: {
       resourceId,
-      status: ReservationStatus.CONFIRMED,
+      status: {
+        in: [ReservationStatus.CONFIRMED, ReservationStatus.PENDING],
+      },
       // If editing, exclude the current reservation itself from collision detection
       ...(excludeReservationId
         ? { id: { not: excludeReservationId } }
@@ -60,6 +62,8 @@ export function formatConflictMessage(conflictingReservation: {
   title: string;
   startTime: Date;
   endTime: Date;
+  status?: ReservationStatus | string;
+  isPrivate?: boolean;
   user?: { name: string } | null;
 }): string {
   const timeSlot = `${formatTime(conflictingReservation.startTime)} – ${formatTime(
@@ -69,5 +73,11 @@ export function formatConflictMessage(conflictingReservation: {
     ? ` by ${conflictingReservation.user.name}`
     : "";
 
-  return `Conflict detected: Time overlaps with "${conflictingReservation.title}" (${timeSlot}${organizer}). Please choose a different time slot.`;
+  if (conflictingReservation.status === ReservationStatus.PENDING) {
+    const titleText = conflictingReservation.isPrivate ? "Private Booking" : conflictingReservation.title;
+    return `Conflict detected: Time overlaps with "${titleText}" (${timeSlot}${organizer}), which is currently pending administrator approval. Please choose a different time slot.`;
+  }
+
+  const titleText = conflictingReservation.isPrivate ? "Private Reservation" : conflictingReservation.title;
+  return `Conflict detected: Time overlaps with "${titleText}" (${timeSlot}${organizer}). Please choose a different time slot.`;
 }
