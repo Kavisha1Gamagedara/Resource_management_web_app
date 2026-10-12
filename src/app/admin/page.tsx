@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { Badge } from "@/components/ui/Badge";
+import { AdminResourceTable } from "@/components/admin/AdminResourceTable";
 import {
   ShieldAlert,
   ShieldCheck,
@@ -148,82 +149,8 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Resources Table */}
-      <div className="rounded-3xl border border-zinc-200/80 bg-white overflow-hidden shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-        <div className="p-4 sm:p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-              All Organizational Resources
-            </h2>
-            <p className="text-xs text-zinc-500">
-              Manage lifecycle status and configuration for rooms, gear, labs, and fleet.
-            </p>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 border-b border-zinc-100 dark:border-zinc-800 font-medium">
-              <tr>
-                <th className="py-3 px-4">Resource Name</th>
-                <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">Location</th>
-                <th className="py-3 px-4">Capacity</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Bookings</th>
-                <th className="py-3 px-4 text-right">RBAC State</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {resources.map((resource) => (
-                <tr key={resource.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/40 transition-colors">
-                  <td className="py-3.5 px-4">
-                    <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">
-                      {resource.name}
-                    </span>
-                    {resource.description && (
-                      <p className="text-[11px] text-zinc-500 line-clamp-1 max-w-xs">
-                        {resource.description}
-                      </p>
-                    )}
-                  </td>
-                  <td className="py-3.5 px-4 text-zinc-600 dark:text-zinc-400">
-                    {resource.category.name}
-                  </td>
-                  <td className="py-3.5 px-4 text-zinc-600 dark:text-zinc-400">
-                    {resource.location}
-                  </td>
-                  <td className="py-3.5 px-4 text-zinc-600 dark:text-zinc-400">
-                    {resource.capacity ? `${resource.capacity} people` : "—"}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <Badge
-                      variant={
-                        resource.status === "ACTIVE"
-                          ? "success"
-                          : resource.status === "MAINTENANCE"
-                          ? "warning"
-                          : "neutral"
-                      }
-                      size="sm"
-                    >
-                      {resource.status}
-                    </Badge>
-                  </td>
-                  <td className="py-3.5 px-4 text-zinc-600 dark:text-zinc-400">
-                    {resource._count.reservations} total
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <span className="text-[11px] text-teal-600 dark:text-teal-400 font-medium">
-                      Admin Editable
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Interactive Resources Management Table */}
+      <AdminResourceTable initialResources={resources} categories={categories} />
     </div>
   );
 }
