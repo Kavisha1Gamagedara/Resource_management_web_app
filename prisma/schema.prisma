@@ -1,0 +1,87 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ResourceStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum ReservationStatus {
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  name         String
+  passwordHash String
+  role         Role          @default(USER)
+  department   String?
+  avatarUrl    String?
+  reservations Reservation[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @default(now()) @updatedAt
+
+  @@index([role])
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  slug        String     @unique
+  description String?
+  resources   Resource[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @default(now()) @updatedAt
+}
+
+model Resource {
+  id           String         @id @default(uuid())
+  name         String
+  description  String?
+  categoryId   String
+  category     Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  location     String
+  capacity     Int?
+  status       ResourceStatus @default(ACTIVE)
+  attributes   Json?
+  reservations Reservation[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @default(now()) @updatedAt
+
+  @@index([categoryId, status])
+  @@index([status])
+}
+
+model Reservation {
+  id         String            @id @default(uuid())
+  title      String
+  notes      String?
+  startTime  DateTime
+  endTime    DateTime
+  status     ReservationStatus @default(CONFIRMED)
+  userId     String
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resourceId String
+  resource   Resource          @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @default(now()) @updatedAt
+
+  @@index([resourceId, startTime, endTime])
+  @@index([userId, startTime])
+  @@index([status])
+}
