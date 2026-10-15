@@ -63,7 +63,14 @@ export default async function HomePage() {
       where: {
         status: "CONFIRMED",
         endTime: { gte: now },
-        ...(isAdmin ? {} : { userId: user?.id || "__UNAUTHENTICATED__" }),
+        ...(isAdmin
+          ? {}
+          : {
+              OR: [
+                { userId: user?.id || "__UNAUTHENTICATED__" },
+                { notes: { contains: `[INVITED_USER:${user?.id || "__UNAUTHENTICATED__"}]` } },
+              ],
+            }),
       },
       orderBy: { startTime: "asc" },
       include: {
@@ -71,7 +78,7 @@ export default async function HomePage() {
           select: { name: true, location: true },
         },
         user: {
-          select: { name: true, department: true },
+          select: { id: true, name: true, department: true },
         },
       },
     }),
@@ -277,50 +284,65 @@ export default async function HomePage() {
         ) : (
           <div className="rounded-2xl border border-zinc-200/80 bg-white overflow-hidden shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
             <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {upcomingReservations.map((res) => (
-                <div
-                  key={res.id}
-                  className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/40 transition-colors"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">
-                        {res.title}
-                      </span>
-                      <Badge variant="success" size="sm">
-                        Confirmed
-                      </Badge>
-                    </div>
-                    <div className="text-xs text-zinc-500 flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-teal-700 dark:text-teal-400">
-                        {res.resource.name}
-                      </span>
-                      <span>•</span>
-                      <span>{res.resource.location}</span>
-                      <span>•</span>
-                      <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                        {formatDate(res.startTime)}
-                      </span>
-                      <span>•</span>
-                      <span>
-                        {formatTimeRange(res.startTime, res.endTime)}
-                      </span>
-                    </div>
-                  </div>
+              {upcomingReservations.map((res) => {
+                const isGroup = res.notes?.includes("[GROUP_BOOKING]");
+                const isInvited = user?.id && res.notes?.includes(`[INVITED_USER:${user.id}]`) && res.user.id !== user.id;
 
-                  <div className="text-xs text-zinc-500 flex items-center gap-2 self-start sm:self-auto">
-                    <span>Reserved by</span>
-                    <span className="font-semibold text-zinc-700 dark:text-zinc-300">
-                      {res.user.name}
-                    </span>
-                    {res.user.department && (
-                      <span className="bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded text-[11px]">
-                        {res.user.department}
+                return (
+                  <div
+                    key={res.id}
+                    className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/40 transition-colors"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">
+                          {res.title}
+                        </span>
+                        <Badge variant="success" size="sm">
+                          Confirmed
+                        </Badge>
+                        {isGroup && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                            👥 Group Booking
+                          </span>
+                        )}
+                        {isInvited && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+                            Invited Attendee
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-zinc-500 flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-teal-700 dark:text-teal-400">
+                          {res.resource.name}
+                        </span>
+                        <span>•</span>
+                        <span>{res.resource.location}</span>
+                        <span>•</span>
+                        <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                          {formatDate(res.startTime)}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          {formatTimeRange(res.startTime, res.endTime)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-zinc-500 flex items-center gap-2 self-start sm:self-auto">
+                      <span>{isInvited ? "Invited by" : "Reserved by"}</span>
+                      <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                        {res.user.name}
                       </span>
-                    )}
+                      {res.user.department && (
+                        <span className="bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded text-[11px]">
+                          {res.user.department}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

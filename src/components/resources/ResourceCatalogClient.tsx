@@ -71,6 +71,8 @@ export function ResourceCatalogClient({
   const [bookingTarget, setBookingTarget] = React.useState<{
     id: string;
     name: string;
+    attributes?: any;
+    capacity?: number | null;
   } | null>(null);
 
   // Filtered resources
@@ -331,7 +333,14 @@ export function ResourceCatalogClient({
                     size="sm"
                     className="w-1/2 text-xs"
                     disabled={!isAvailable}
-                    onClick={() => setBookingTarget({ id: res.id, name: res.name })}
+                    onClick={() =>
+                      setBookingTarget({
+                        id: res.id,
+                        name: res.name,
+                        attributes: res.attributes,
+                        capacity: res.capacity,
+                      })
+                    }
                   >
                     {isAvailable ? "Reserve" : "Unavailable"}
                   </Button>
@@ -349,6 +358,8 @@ export function ResourceCatalogClient({
           onClose={() => setBookingTarget(null)}
           resourceId={bookingTarget.id}
           resourceName={bookingTarget.name}
+          resourceAttributes={bookingTarget.attributes}
+          resourceCapacity={bookingTarget.capacity}
           onSuccess={() => {
             router.refresh();
           }}

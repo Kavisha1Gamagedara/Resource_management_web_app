@@ -245,6 +245,8 @@ export function ResourceDetailClient({ resource }: ResourceDetailClientProps) {
           onClose={() => setIsBookingOpen(false)}
           resourceId={resource.id}
           resourceName={resource.name}
+          resourceAttributes={resource.attributes}
+          resourceCapacity={resource.capacity}
           initialStartTime={selectedSlot?.start}
           initialEndTime={selectedSlot?.end}
           onSuccess={() => {

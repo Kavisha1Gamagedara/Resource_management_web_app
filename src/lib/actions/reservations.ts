@@ -6,6 +6,7 @@ import { requireAuth, requireAdmin, getCurrentUser } from "@/lib/auth";
 import { reservationSchema, ReservationInput } from "@/lib/validations/reservation";
 import { findConflict, formatConflictMessage, findSmartAlternatives } from "@/lib/booking-engine";
 import { ResourceStatus, ReservationStatus, Role } from "@prisma/client";
+import { formatGroupBookingTags } from "@/lib/group-booking";
 
 function safeRevalidatePath(path: string) {
   try {
@@ -72,6 +73,45 @@ export async function createReservation(input: ReservationInput) {
         }
         bookingUserId = targetUser.id;
         tags.push(`[BOOKED_BY_ADMIN:${user.name || "Administrator"}]`);
+      }
+
+      // Group Booking: Check resource support & capacity
+      if (validatedData.invitedUserIds && validatedData.invitedUserIds.length > 0) {
+        const resourceAttrs = (resource.attributes as any) || {};
+        const supportsGroup = resourceAttrs.allowGroupBooking !== false;
+        const maxCap =
+          typeof resourceAttrs.maxGroupCapacity === "number"
+            ? resourceAttrs.maxGroupCapacity
+            : (resource.capacity || 10);
+
+        if (!supportsGroup) {
+          throw new Error(
+            `This resource (${resource.name}) is configured for individual use only and does not support group bookings.`
+          );
+        }
+        if (1 + validatedData.invitedUserIds.length > maxCap) {
+          throw new Error(
+            `Exceeds maximum group capacity. This resource allows at most ${maxCap} people (including host).`
+          );
+        }
+
+        const invitedUsers = await tx.user.findMany({
+          where: {
+            id: { in: validatedData.invitedUserIds },
+            role: Role.USER, // Strictly normal users without admin
+            NOT: { id: bookingUserId }, // Exclude creator
+          },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            department: true,
+          },
+        });
+        if (invitedUsers.length > 0) {
+          const groupTags = formatGroupBookingTags(invitedUsers);
+          if (groupTags) tags.push(groupTags);
+        }
       }
 
       const userNotes = validatedData.notes?.trim() || "";
@@ -164,12 +204,28 @@ export async function updateReservation(id: string, input: ReservationInput) {
         throw new Error(formatConflictMessage(conflict));
       }
 
-      // 3. Update reservation
+      // 3. Update reservation (preserving internal system metadata tags while saving clean user notes)
+      const existingTags: string[] = [];
+      if (existingReservation.notes) {
+        const tagRegex =
+          /\[(AUTO_RELEASE_ENABLED|AUTO_RELEASE_DISABLED|CHECKED_IN:[^\]]+|AUTO_RELEASED[^\]]*|PRIVATE|BOOKED_BY_ADMIN:[^\]]+|CANCELLED_BY_ADMIN:[^\]]+|CANCELLED_BY_USER:[^\]]+|ADMIN_CANCEL_REASON:[^\]]+|USER_CANCEL_REASON:[^\]]+|REASON:[^\]]+|CANCEL_REASON:[^\]]+|GROUP_BOOKING|INVITED_USER:[^\]]+|GROUP_ATTENDEES:[^\]]+)\]/g;
+        const matches = existingReservation.notes.match(tagRegex);
+        if (matches) {
+          existingTags.push(...matches);
+        }
+      }
+
+      const updatedUserNotes = validatedData.notes?.trim() || "";
+      const finalNotes =
+        existingTags.length > 0
+          ? `${existingTags.join(" ")} ${updatedUserNotes}`.trim()
+          : updatedUserNotes || null;
+
       return await tx.reservation.update({
         where: { id },
         data: {
           title: validatedData.title.trim(),
-          notes: validatedData.notes?.trim() || null,
+          notes: finalNotes,
           startTime: validatedData.startTime,
           endTime: validatedData.endTime,
           resourceId: validatedData.resourceId,
@@ -599,11 +655,26 @@ export async function simulateGhostRelease(id: string) {
 export async function getMyReservations() {
   const user = await requireAuth();
   return await prisma.reservation.findMany({
-    where: { userId: user.id },
+    where: {
+      OR: [
+        { userId: user.id },
+        { notes: { contains: `[INVITED_USER:${user.id}]` } },
+      ],
+    },
     orderBy: { startTime: "asc" },
     include: {
       resource: {
         include: { category: true },
+      },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          department: true,
+          role: true,
+          avatarUrl: true,
+        },
       },
     },
   });
@@ -643,7 +714,14 @@ export async function getTeamReservations() {
   const isAdmin = user?.role === Role.ADMIN;
 
   return await prisma.reservation.findMany({
-    where: isAdmin ? {} : { userId: user?.id || "__UNAUTHENTICATED__" },
+    where: isAdmin
+      ? {}
+      : {
+          OR: [
+            { userId: user?.id || "__UNAUTHENTICATED__" },
+            { notes: { contains: `[INVITED_USER:${user?.id || "__UNAUTHENTICATED__"}]` } },
+          ],
+        },
     orderBy: { startTime: "asc" },
     include: {
       resource: {

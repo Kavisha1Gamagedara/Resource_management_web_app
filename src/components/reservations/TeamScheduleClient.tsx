@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { formatTime, formatDate } from "@/lib/utils";
 import { AddToCalendarButton } from "./AddToCalendarButton";
+import { cleanUserNotes } from "@/lib/ghost-booking";
 
 interface TeamScheduleClientProps {
   initialReservations: any[];
@@ -253,9 +254,9 @@ export function TeamScheduleClient({
                       </span>
                     </div>
 
-                    {res.notes && (
+                    {cleanUserNotes(res.notes) && (
                       <p className="text-xs text-slate-600 dark:text-slate-400 italic bg-slate-50 dark:bg-slate-950/60 p-2 rounded-lg border border-slate-200 dark:border-slate-800/60 max-w-xl">
-                        &quot;{res.notes}&quot;
+                        &quot;{cleanUserNotes(res.notes)}&quot;
                       </p>
                     )}
                   </div>

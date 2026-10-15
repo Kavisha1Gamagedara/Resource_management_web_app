@@ -45,6 +45,7 @@ import { format } from "date-fns";
 import { AdminCreateReservationModal } from "./AdminCreateReservationModal";
 import { cancelReservation } from "@/lib/actions/reservations";
 import { formatDate, formatTime } from "@/lib/utils";
+import { toast } from "@/components/ui/toast";
 
 interface AdminDashboardClientProps {
   initialResources: any[];
@@ -74,9 +75,10 @@ export function AdminDashboardClient({
   const [formCapacity, setFormCapacity] = React.useState<string>("");
   const [formDescription, setFormDescription] = React.useState("");
   const [formStatus, setFormStatus] = React.useState<ResourceStatus>(ResourceStatus.ACTIVE);
-  const [formAttributes, setFormAttributes] = React.useState("");
   const [requireBuffer, setRequireBuffer] = React.useState(false);
   const [bufferMinutes, setBufferMinutes] = React.useState(15);
+  const [supportGroupBooking, setSupportGroupBooking] = React.useState(true);
+  const [maxGroupCapacity, setMaxGroupCapacity] = React.useState<string>("6");
 
   const [isSaving, setIsSaving] = React.useState(false);
   const [formError, setFormError] = React.useState("");
@@ -91,7 +93,8 @@ export function AdminDashboardClient({
     setFormStatus(ResourceStatus.ACTIVE);
     setRequireBuffer(false);
     setBufferMinutes(15);
-    setFormAttributes(JSON.stringify({ screen: "4K TV", whiteboard: true }, null, 2));
+    setSupportGroupBooking(true);
+    setMaxGroupCapacity("6");
     setFormError("");
     setIsModalOpen(true);
   };
@@ -107,9 +110,8 @@ export function AdminDashboardClient({
     const attrs = res.attributes || {};
     setRequireBuffer(Boolean(attrs.bufferMinutes && Number(attrs.bufferMinutes) > 0));
     setBufferMinutes(attrs.bufferMinutes ? Number(attrs.bufferMinutes) : 15);
-    setFormAttributes(
-      res.attributes ? JSON.stringify(res.attributes, null, 2) : "{}"
-    );
+    setSupportGroupBooking(attrs.allowGroupBooking !== false);
+    setMaxGroupCapacity(attrs.maxGroupCapacity ? String(attrs.maxGroupCapacity) : (res.capacity ? String(res.capacity) : "6"));
     setFormError("");
     setIsModalOpen(true);
   };
@@ -226,16 +228,22 @@ export function AdminDashboardClient({
       });
 
       if (!res.success) {
-        setUserError(res.error || "Failed to create user.");
+        const errText = res.error || "Failed to create user.";
+        toast.error(errText);
+        setUserError(errText);
       } else {
-        setUserSuccess(`User account for "${userName}" created successfully!`);
+        const successMsg = `User account for "${userName}" created successfully!`;
+        toast.success(successMsg);
+        setUserSuccess(successMsg);
         setTimeout(() => {
           setIsUserModalOpen(false);
           router.refresh();
-        }, 1000);
+        }, 800);
       }
     } catch (err: any) {
-      setUserError(err?.message || "An unexpected error occurred.");
+      const errText = err?.message || "An unexpected error occurred.";
+      toast.error(errText);
+      setUserError(errText);
     } finally {
       setIsUserSaving(false);
     }
@@ -259,21 +267,25 @@ export function AdminDashboardClient({
     setFormError("");
     setIsSaving(true);
 
-    let parsedAttrs = {};
-    if (formAttributes.trim()) {
-      try {
-        parsedAttrs = JSON.parse(formAttributes);
-      } catch {
-        setFormError("Attributes must be valid JSON format (e.g. {\"screen\": \"4K TV\"})");
-        setIsSaving(false);
-        return;
+    let parsedAttrs: Record<string, any> = {};
+    if (editingId) {
+      const existing = (initialResources || []).find((r: any) => r.id === editingId);
+      if (existing?.attributes && typeof existing.attributes === "object") {
+        parsedAttrs = { ...existing.attributes };
       }
     }
 
     if (requireBuffer) {
-      (parsedAttrs as any).bufferMinutes = Number(bufferMinutes) || 15;
+      parsedAttrs.bufferMinutes = Number(bufferMinutes) || 15;
     } else {
-      delete (parsedAttrs as any).bufferMinutes;
+      delete parsedAttrs.bufferMinutes;
+    }
+
+    parsedAttrs.allowGroupBooking = Boolean(supportGroupBooking);
+    if (supportGroupBooking && maxGroupCapacity) {
+      parsedAttrs.maxGroupCapacity = Number(maxGroupCapacity) || 6;
+    } else {
+      delete parsedAttrs.maxGroupCapacity;
     }
 
     try {
@@ -289,14 +301,18 @@ export function AdminDashboardClient({
 
       if (editingId) {
         await updateResource(editingId, payload);
+        toast.success(`Resource "${formName}" updated successfully!`);
       } else {
         await createResource(payload);
+        toast.success(`Resource "${formName}" created successfully!`);
       }
 
       setIsModalOpen(false);
       router.refresh();
     } catch (err: any) {
-      setFormError(err.message || "Failed to save resource.");
+      const errText = err.message || "Failed to save resource.";
+      toast.error(errText);
+      setFormError(errText);
     } finally {
       setIsSaving(false);
     }
@@ -310,9 +326,10 @@ export function AdminDashboardClient({
 
     try {
       await setResourceStatus(id, nextStatus);
+      toast.success(`Resource status updated to ${nextStatus}.`);
       router.refresh();
     } catch (err: any) {
-      alert(err.message || "Failed to change resource status.");
+      toast.error(err.message || "Failed to change resource status.");
     }
   };
 
@@ -468,6 +485,15 @@ export function AdminDashboardClient({
                     {Number((res.attributes as any)?.bufferMinutes) > 0 && (
                       <Badge variant="teal" className="text-[10px] gap-1">
                         <span>🧹</span> {(res.attributes as any).bufferMinutes}m Turnaround Buffer
+                      </Badge>
+                    )}
+                    {(res.attributes as any)?.allowGroupBooking === false ? (
+                      <Badge variant="neutral" className="text-[10px] gap-1">
+                        <span>👤</span> Single-User Only
+                      </Badge>
+                    ) : (
+                      <Badge variant="purple" className="text-[10px] gap-1">
+                        <span>👥</span> Group Booking (Max {(res.attributes as any)?.maxGroupCapacity || res.capacity || 6} people)
                       </Badge>
                     )}
                   </div>
@@ -832,8 +858,17 @@ export function AdminDashboardClient({
                             className="text-xs"
                             onClick={async () => {
                               if (window.confirm(`Cancel reservation for "${res.title}" booked by ${res.user?.name}?`)) {
-                                await cancelReservation(res.id);
-                                router.refresh();
+                                try {
+                                  const cancelRes = await cancelReservation(res.id);
+                                  if (cancelRes.success) {
+                                    toast.success(`Reservation for "${res.title}" cancelled successfully.`);
+                                  } else {
+                                    toast.error(cancelRes.error || "Failed to cancel reservation.");
+                                  }
+                                  router.refresh();
+                                } catch (err: any) {
+                                  toast.error(err?.message || "Failed to cancel reservation.");
+                                }
                               }
                             }}
                           >
@@ -1005,16 +1040,51 @@ export function AdminDashboardClient({
               )}
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Attributes & Specs (JSON)
-              </label>
-              <textarea
-                className="w-full h-20 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-mono text-emerald-700 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 shadow-2xs dark:border-slate-700/80 dark:bg-slate-950 dark:text-emerald-300 dark:placeholder:text-slate-500"
-                placeholder='{"screen": "4K Display", "whiteboard": true}'
-                value={formAttributes}
-                onChange={(e) => setFormAttributes(e.target.value)}
-              />
+            {/* Story: Group Booking Support Configuration */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-3 dark:border-slate-800 dark:bg-slate-900/60">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <span className="text-base">👥</span>
+                  <div>
+                    <label
+                      htmlFor="form-group-booking-toggle"
+                      className="text-xs font-semibold text-slate-800 dark:text-slate-200 block cursor-pointer"
+                    >
+                      Support Group Bookings (Teammate Invites)
+                    </label>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                      Allow users to invite teammates when booking this resource.
+                    </span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  id="form-group-booking-toggle"
+                  checked={supportGroupBooking}
+                  onChange={(e) => setSupportGroupBooking(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer mt-0.5 dark:border-slate-700 dark:bg-slate-900"
+                />
+              </div>
+
+              {supportGroupBooking && (
+                <div className="pt-2.5 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-3">
+                  <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                    Maximum Group Capacity (People):
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={2}
+                      max={100}
+                      value={maxGroupCapacity}
+                      onChange={(e) => setMaxGroupCapacity(e.target.value)}
+                      className="w-20 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 font-semibold text-center"
+                      placeholder="e.g. 6"
+                    />
+                    <span className="text-xs text-slate-500">people max</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
