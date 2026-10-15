@@ -73,8 +73,8 @@ export default async function AdminDashboardPage() {
     );
   }
 
-  // User is verified ADMIN: Query all resources, categories, operations telemetry, and company users
-  const [resources, categories, operationsAnalytics, companyUsers] = await Promise.all([
+  // User is verified ADMIN: Query all resources, categories, operations telemetry, company users, and all reservations
+  const [resources, categories, operationsAnalytics, companyUsers, allReservations] = await Promise.all([
     prisma.resource.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -100,6 +100,24 @@ export default async function AdminDashboardPage() {
         createdAt: true,
         _count: {
           select: { reservations: true },
+        },
+      },
+    }),
+    prisma.reservation.findMany({
+      orderBy: { startTime: "asc" },
+      include: {
+        resource: {
+          include: { category: true },
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            department: true,
+            role: true,
+            avatarUrl: true,
+          },
         },
       },
     }),
@@ -161,9 +179,9 @@ export default async function AdminDashboardPage() {
         </div>
 
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-          <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Offline / Maintenance</span>
-          <p className="mt-2 text-2xl font-bold text-amber-700 dark:text-amber-400">{maintenanceCount + inactiveCount}</p>
-          <span className="text-[11px] text-zinc-400">Deactivated or servicing</span>
+          <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Total Reservations</span>
+          <p className="mt-2 text-2xl font-bold text-amber-700 dark:text-amber-400">{allReservations.length}</p>
+          <span className="text-[11px] text-zinc-400">All corporate bookings</span>
         </div>
       </div>
 
@@ -175,6 +193,7 @@ export default async function AdminDashboardPage() {
         initialResources={resources}
         categories={categories}
         initialUsers={companyUsers}
+        initialReservations={allReservations}
       />
     </div>
   );

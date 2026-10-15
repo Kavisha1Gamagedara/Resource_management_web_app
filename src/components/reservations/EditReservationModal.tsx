@@ -51,9 +51,41 @@ export function EditReservationModal({
 
   if (!isOpen || !reservation) return null;
 
+  const isReservationPast = new Date(reservation.endTime).getTime() <= Date.now();
+
+  if (isReservationPast) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="relative w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 text-center space-y-4">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+            Cannot Edit Past Reservation
+          </h3>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            This reservation has already concluded and is locked in the audit log. Completed or past reservations cannot be modified or rescheduled.
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 px-5 py-2 text-xs font-semibold cursor-pointer hover:opacity-90"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (isReservationPast) {
+      setError("Past reservations cannot be edited.");
+      return;
+    }
 
     const [startH, startM] = startTimeStr.split(":").map(Number);
     const [endH, endM] = endTimeStr.split(":").map(Number);

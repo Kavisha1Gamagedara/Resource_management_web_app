@@ -40,7 +40,11 @@ export function Navbar() {
     { label: "Home", href: "/", icon: Home },
     { label: "Resources", href: "/resources", icon: Layers },
     ...(isAdmin ? [{ label: "Team Schedule", href: "/reservations", icon: CalendarDays }] : []),
-    { label: "My Bookings", href: "/my-reservations", icon: BookmarkCheck },
+    {
+      label: isAdmin ? "All Reservations" : "My Bookings",
+      href: "/my-reservations",
+      icon: BookmarkCheck,
+    },
   ];
 
   return (

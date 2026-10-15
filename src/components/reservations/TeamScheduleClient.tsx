@@ -224,7 +224,7 @@ export function TeamScheduleClient({
                           <XCircle className="w-3 h-3 mr-1" /> Cancelled
                         </Badge>
                       )}
-                      {isConfirmed && (
+                      {isConfirmed && new Date(res.endTime).getTime() > Date.now() && (
                         <AddToCalendarButton
                           event={{
                             id: res.id,

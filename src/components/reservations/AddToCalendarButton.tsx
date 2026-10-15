@@ -20,6 +20,12 @@ export function AddToCalendarButton({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // For past reservations, Add to Calendar should not be available
+  const isPast = event.endTime ? new Date(event.endTime).getTime() <= Date.now() : false;
+  if (isPast) {
+    return null;
+  }
+
   // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -134,6 +140,12 @@ export function AddToCalendarActionGroup({
   event: CalendarEventData;
   className?: string;
 }) {
+  // For past reservations, Add to Calendar should not be available
+  const isPast = event.endTime ? new Date(event.endTime).getTime() <= Date.now() : false;
+  if (isPast) {
+    return null;
+  }
+
   const googleUrl = generateGoogleCalendarUrl(event);
 
   const handleDownloadIcs = () => {
