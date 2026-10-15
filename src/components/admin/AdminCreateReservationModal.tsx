@@ -15,8 +15,13 @@ import {
   ArrowRight,
   ShieldCheck,
   Search,
+  Users,
+  UserCheck,
 } from "lucide-react";
 import { createReservation, checkLiveConflict } from "@/lib/actions/reservations";
+import { getInvitableUsers } from "@/lib/actions/users";
+import { updateResource } from "@/lib/actions/resources";
+import { toast } from "@/components/ui/toast";
 
 interface UserOption {
   id: string;
@@ -32,8 +37,12 @@ interface ResourceOption {
   name: string;
   location: string;
   category?: {
+    id?: string;
     name: string;
   } | null;
+  categoryId?: string;
+  capacity?: number | null;
+  status?: any;
   attributes?: any;
 }
 
@@ -67,11 +76,41 @@ export function AdminCreateReservationModal({
   const [isPrivate, setIsPrivate] = useState(false);
   const [autoRelease, setAutoRelease] = useState(true);
 
+  // Group Booking & Capacity Configuration
+  const [isGroupBooking, setIsGroupBooking] = useState(true);
+  const [maxGroupCapacity, setMaxGroupCapacity] = useState<number>(6);
+  const [saveResourceDefaults, setSaveResourceDefaults] = useState(true);
+  const [selectedAttendees, setSelectedAttendees] = useState<{
+    id: string;
+    name: string;
+    email: string;
+    department?: string | null;
+  }[]>([]);
+  const [invitableUsers, setInvitableUsers] = useState<{
+    id: string;
+    name: string;
+    email: string;
+    department?: string | null;
+  }[]>([]);
+  const [attendeeSearchQuery, setAttendeeSearchQuery] = useState("");
+  const [isAttendeeDropdownOpen, setIsAttendeeDropdownOpen] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingConflict, setIsCheckingConflict] = useState(false);
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successBooking, setSuccessBooking] = useState<any | null>(null);
+
+  // Fetch available normal users for group booking
+  useEffect(() => {
+    if (isOpen) {
+      getInvitableUsers()
+        .then((data) => {
+          if (data) setInvitableUsers(data);
+        })
+        .catch(() => {});
+    }
+  }, [isOpen]);
 
   // Initialize defaults when modal opens
   useEffect(() => {
@@ -101,6 +140,9 @@ export function AdminCreateReservationModal({
       setNotes("");
       setIsPrivate(false);
       setAutoRelease(true);
+      setSelectedAttendees([]);
+      setAttendeeSearchQuery("");
+      setIsAttendeeDropdownOpen(false);
       setConflictWarning(null);
       setSubmitError(null);
       setSuccessBooking(null);
@@ -127,6 +169,40 @@ export function AdminCreateReservationModal({
   const selectedResourceObj = useMemo(() => {
     return resources.find((r) => r.id === selectedResourceId);
   }, [resources, selectedResourceId]);
+
+  // Synchronize resource group settings whenever selected resource changes
+  useEffect(() => {
+    if (selectedResourceObj) {
+      const attrs = (selectedResourceObj.attributes as any) || {};
+      const supports = attrs.allowGroupBooking !== false;
+      setIsGroupBooking(supports);
+      const cap =
+        typeof attrs.maxGroupCapacity === "number"
+          ? attrs.maxGroupCapacity
+          : typeof selectedResourceObj.capacity === "number" && selectedResourceObj.capacity > 0
+          ? selectedResourceObj.capacity
+          : 6;
+      setMaxGroupCapacity(cap);
+    }
+  }, [selectedResourceId, selectedResourceObj]);
+
+  // Filter eligible colleagues to invite (excluding host user and already selected)
+  const eligibleColleagues = useMemo(() => {
+    return invitableUsers.filter(
+      (u) => u.id !== selectedUserId && !selectedAttendees.some((sel) => sel.id === u.id)
+    );
+  }, [invitableUsers, selectedUserId, selectedAttendees]);
+
+  const filteredColleagues = useMemo(() => {
+    if (!attendeeSearchQuery.trim()) return eligibleColleagues;
+    const q = attendeeSearchQuery.toLowerCase();
+    return eligibleColleagues.filter(
+      (u) =>
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.department && u.department.toLowerCase().includes(q))
+    );
+  }, [eligibleColleagues, attendeeSearchQuery]);
 
   // Check if currently selected date/time is in the past
   const isSelectedTimePast = useMemo(() => {
@@ -212,6 +288,13 @@ export function AdminCreateReservationModal({
       return;
     }
 
+    if (isGroupBooking && selectedAttendees.length > maxGroupCapacity - 1) {
+      setSubmitError(
+        `Cannot invite more than ${maxGroupCapacity - 1} colleagues (Maximum capacity is ${maxGroupCapacity} people including host).`
+      );
+      return;
+    }
+
     const [startH, startM] = startTimeStr.split(":").map(Number);
     const [endH, endM] = endTimeStr.split(":").map(Number);
 
@@ -231,11 +314,36 @@ export function AdminCreateReservationModal({
         endTime: end,
         isPrivate,
         autoRelease,
+        invitedUserIds: isGroupBooking ? selectedAttendees.map((a) => a.id) : [],
       });
+
+      // Synchronize resource profile group settings if checked
+      if (saveResourceDefaults && selectedResourceObj) {
+        try {
+          const curAttrs = (selectedResourceObj.attributes as any) || {};
+          await updateResource(selectedResourceId, {
+            name: selectedResourceObj.name,
+            categoryId: selectedResourceObj.categoryId || (selectedResourceObj.category as any)?.id || "",
+            location: selectedResourceObj.location,
+            capacity: selectedResourceObj.capacity ?? null,
+            status: selectedResourceObj.status,
+            attributes: {
+              ...curAttrs,
+              allowGroupBooking: isGroupBooking,
+              maxGroupCapacity: Number(maxGroupCapacity) || 6,
+            },
+          });
+        } catch (syncErr) {
+          console.warn("Could not synchronize resource attributes:", syncErr);
+        }
+      }
 
       setIsSubmitting(false);
 
       if (result.success && result.reservation) {
+        toast.success(
+          `Reservation created successfully for ${selectedUserObj?.name || "employee"}!`
+        );
         setSuccessBooking({
           id: result.reservation.id,
           title: title.trim(),
@@ -244,14 +352,21 @@ export function AdminCreateReservationModal({
           resourceName: selectedResourceObj?.name || "Facility",
           startTime: start,
           endTime: end,
+          isGroupBooking,
+          maxGroupCapacity,
+          invitedAttendees: isGroupBooking ? [...selectedAttendees] : [],
         });
         if (onSuccess) onSuccess();
       } else {
-        setSubmitError(result.error || "Reservation failed.");
+        const errText = result.error || "Reservation failed.";
+        toast.error(errText);
+        setSubmitError(errText);
       }
     } catch (err: any) {
       setIsSubmitting(false);
-      setSubmitError(err?.message || "An unexpected error occurred.");
+      const errText = err?.message || "An unexpected error occurred.";
+      toast.error(errText);
+      setSubmitError(errText);
     }
   };
 
@@ -324,6 +439,28 @@ export function AdminCreateReservationModal({
                   </span>
                 </span>
               </div>
+
+              {successBooking.invitedAttendees && successBooking.invitedAttendees.length > 0 && (
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700/60 text-xs">
+                  <span className="font-semibold text-purple-600 dark:text-purple-400 block mb-1 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Group Booking ({successBooking.invitedAttendees.length + 1} attendees):</span>
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-200 text-[11px] font-semibold">
+                      Host: {successBooking.userName}
+                    </span>
+                    {successBooking.invitedAttendees.map((att: any) => (
+                      <span
+                        key={att.id}
+                        className="px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 text-[11px] border border-zinc-200 dark:border-zinc-700"
+                      >
+                        {att.name} {att.department ? `(${att.department})` : ""}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end">
@@ -528,6 +665,187 @@ export function AdminCreateReservationModal({
                 onChange={(e) => setNotes(e.target.value)}
                 className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-zinc-900 outline-none focus:border-purple-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 shadow-sm"
               />
+            </div>
+
+            {/* Story: Group Booking & Capacity Configuration */}
+            <div className="rounded-2xl border border-purple-200/80 bg-purple-50/60 p-4 space-y-3 dark:border-purple-900/50 dark:bg-purple-950/25">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <span className="text-lg">👥</span>
+                  <div>
+                    <label
+                      htmlFor="adminGroupBookingToggle"
+                      className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 block cursor-pointer"
+                    >
+                      Resource Supports Group Booking
+                    </label>
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block mt-0.5">
+                      Tick if this facility allows group reservations and colleague invitations.
+                    </span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  id="adminGroupBookingToggle"
+                  checked={isGroupBooking}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsGroupBooking(checked);
+                    if (!checked) {
+                      setSelectedAttendees([]);
+                    }
+                  }}
+                  className="mt-0.5 rounded border-zinc-300 text-purple-600 focus:ring-purple-500 cursor-pointer h-4 w-4"
+                />
+              </div>
+
+              {isGroupBooking ? (
+                <div className="space-y-3 pt-3 border-t border-purple-200/70 dark:border-purple-900/40">
+                  {/* Maximum People Input */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+                        Maximum People (Capacity):
+                      </span>
+                      <span className="block text-[10px] text-zinc-500 dark:text-zinc-400">
+                        Total attendance including {selectedUserObj?.name?.split(" ")[0] || "host"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={2}
+                        max={100}
+                        value={maxGroupCapacity}
+                        onChange={(e) => {
+                          const val = Math.max(2, Math.min(100, Number(e.target.value) || 2));
+                          setMaxGroupCapacity(val);
+                          if (selectedAttendees.length > val - 1) {
+                            setSelectedAttendees(selectedAttendees.slice(0, val - 1));
+                          }
+                        }}
+                        className="w-20 bg-white border border-zinc-300 rounded-lg text-xs text-zinc-800 px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-purple-500 dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-200 font-semibold text-center"
+                      />
+                      <span className="text-xs text-zinc-500">people max</span>
+                    </div>
+                  </div>
+
+                  {/* Teammate Invites Search & Dropdown */}
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                        Invite Colleagues to this Reservation:
+                      </span>
+                      <span className="text-[11px] font-mono font-medium text-purple-700 dark:text-purple-300">
+                        {selectedAttendees.length + 1} / {maxGroupCapacity} people
+                      </span>
+                    </div>
+
+                    {/* Selected Attendees Chips */}
+                    {selectedAttendees.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 p-2 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                        {selectedAttendees.map((att) => (
+                          <span
+                            key={att.id}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-purple-100 text-purple-900 dark:bg-purple-950/70 dark:text-purple-200 font-medium border border-purple-200 dark:border-purple-800/60"
+                          >
+                            <span>{att.name}</span>
+                            {att.department && (
+                              <span className="text-[10px] opacity-70">({att.department})</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedAttendees(selectedAttendees.filter((a) => a.id !== att.id))}
+                              className="text-purple-700 dark:text-purple-300 hover:text-red-600 transition-colors cursor-pointer"
+                              title="Remove colleague"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Search and Add Colleagues */}
+                    {selectedAttendees.length < maxGroupCapacity - 1 ? (
+                      <div className="relative">
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-zinc-400" />
+                          <input
+                            type="text"
+                            placeholder="Search colleagues to invite (name, email, dept)..."
+                            value={attendeeSearchQuery}
+                            onFocus={() => setIsAttendeeDropdownOpen(true)}
+                            onChange={(e) => {
+                              setAttendeeSearchQuery(e.target.value);
+                              setIsAttendeeDropdownOpen(true);
+                            }}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 outline-none focus:border-purple-500 bg-white shadow-xs"
+                          />
+                        </div>
+
+                        {/* Dropdown */}
+                        {isAttendeeDropdownOpen && (
+                          <div className="absolute left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900 z-30">
+                            {filteredColleagues.length === 0 ? (
+                              <div className="p-3 text-[11px] text-zinc-500 text-center">
+                                No eligible colleagues found matching search.
+                              </div>
+                            ) : (
+                              filteredColleagues.map((user) => (
+                                <button
+                                  key={user.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedAttendees([...selectedAttendees, user]);
+                                    setAttendeeSearchQuery("");
+                                    setIsAttendeeDropdownOpen(false);
+                                  }}
+                                  className="w-full px-3 py-2 text-left hover:bg-purple-50 dark:hover:bg-purple-950/40 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 last:border-b-0 cursor-pointer"
+                                >
+                                  <div>
+                                    <div className="font-semibold text-xs text-zinc-900 dark:text-zinc-100">
+                                      {user.name}
+                                    </div>
+                                    <div className="text-[10px] text-zinc-500">
+                                      {user.email} {user.department ? `• ${user.department}` : ""}
+                                    </div>
+                                  </div>
+                                  <span className="text-[11px] text-purple-600 dark:text-purple-400 font-medium">
+                                    + Invite
+                                  </span>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-2 rounded-xl bg-purple-100/60 dark:bg-purple-950/40 text-[11px] text-purple-800 dark:text-purple-300 font-medium text-center">
+                        Maximum group capacity of {maxGroupCapacity} people reached (including host).
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Save to Resource Profile Option */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="saveResourceDefaults"
+                      checked={saveResourceDefaults}
+                      onChange={(e) => setSaveResourceDefaults(e.target.checked)}
+                      className="rounded border-zinc-300 text-purple-600 focus:ring-purple-500 cursor-pointer h-3.5 w-3.5"
+                    />
+                    <label htmlFor="saveResourceDefaults" className="text-[11px] text-zinc-600 dark:text-zinc-400 cursor-pointer">
+                      Save group booking capability & max capacity to this resource's profile
+                    </label>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[11px] text-zinc-500 dark:text-zinc-400 italic pt-1 border-t border-purple-200/40 dark:border-purple-900/30">
+                  Individual booking only. Multi-person invitations are turned off.
+                </div>
+              )}
             </div>
 
             {/* Ghost Booking Guard */}

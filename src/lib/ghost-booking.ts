@@ -51,7 +51,25 @@ export function parseCheckInStatus(notes?: string | null): ParsedCheckInStatus {
     isCheckedIn = true;
   }
 
-  const cleanNotes = notes
+  const cleanNotes = cleanUserNotes(notes);
+
+  return {
+    isCheckedIn,
+    checkedInAt,
+    isAutoReleased,
+    autoReleaseEnabled,
+    isPrivate,
+    cleanNotes,
+  };
+}
+
+/**
+ * Strips all internal system metadata tags from reservation notes, returning
+ * only the genuine human-written user note, or empty string if no user note exists.
+ */
+export function cleanUserNotes(notes?: string | null): string {
+  if (!notes) return "";
+  return notes
     .replace(/\[AUTO_RELEASE_ENABLED\]/g, "")
     .replace(/AUTO_RELEASE_ENABLED/g, "")
     .replace(/\[AUTO_RELEASE_DISABLED\]/g, "")
@@ -63,18 +81,15 @@ export function parseCheckInStatus(notes?: string | null): ParsedCheckInStatus {
     .replace(/\[PRIVATE\]/g, "")
     .replace(/\[BOOKED_BY_ADMIN:[^\]]+\]/g, "")
     .replace(/\[CANCELLED_BY_ADMIN:[^\]]+\]/g, "")
+    .replace(/\[CANCELLED_BY_USER:[^\]]+\]/g, "")
+    .replace(/\[ADMIN_CANCEL_REASON:[^\]]+\]/g, "")
+    .replace(/\[USER_CANCEL_REASON:[^\]]+\]/g, "")
     .replace(/\[REASON:[^\]]+\]/g, "")
     .replace(/\[CANCEL_REASON:[^\]]+\]/g, "")
+    .replace(/\[GROUP_BOOKING\]/g, "")
+    .replace(/\[INVITED_USER:[^\]]+\]/g, "")
+    .replace(/\[GROUP_ATTENDEES:[^\]]+\]/g, "")
     .trim();
-
-  return {
-    isCheckedIn,
-    checkedInAt,
-    isAutoReleased,
-    autoReleaseEnabled,
-    isPrivate,
-    cleanNotes,
-  };
 }
 
 /**

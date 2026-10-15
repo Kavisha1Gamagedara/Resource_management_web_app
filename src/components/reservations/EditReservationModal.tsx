@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import { format, setHours, setMinutes } from "date-fns";
 import { X, Clock, Calendar, AlertTriangle, Loader2 } from "lucide-react";
 import { updateReservation } from "@/lib/actions/reservations";
+import { cleanUserNotes } from "@/lib/ghost-booking";
+import { toast } from "@/components/ui/toast";
 
 interface EditReservationModalProps {
   isOpen: boolean;
@@ -39,7 +41,7 @@ export function EditReservationModal({
   useEffect(() => {
     if (reservation && isOpen) {
       setTitle(reservation.title);
-      setNotes(reservation.notes || "");
+      setNotes(cleanUserNotes(reservation.notes));
       const start = new Date(reservation.startTime);
       const end = new Date(reservation.endTime);
       setDateStr(format(start, "yyyy-MM-dd"));
@@ -114,14 +116,19 @@ export function EditReservationModal({
       setIsSubmitting(false);
 
       if (res.success && res.reservation) {
+        toast.success(`Reservation "${res.reservation.title}" updated successfully!`);
         onSuccess(res.reservation);
         onClose();
       } else {
-        setError(res.error || "Failed to update reservation.");
+        const errText = res.error || "Failed to update reservation.";
+        toast.error(errText);
+        setError(errText);
       }
     } catch (err: any) {
       setIsSubmitting(false);
-      setError(err?.message || "An unexpected error occurred.");
+      const errText = err?.message || "An unexpected error occurred.";
+      toast.error(errText);
+      setError(errText);
     }
   };
 

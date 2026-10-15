@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createResource } from "@/lib/actions/resources";
 import { ResourceStatus } from "@prisma/client";
 import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { toast } from "@/components/ui/toast";
 
 interface CreateResourceFormProps {
   categories: {
@@ -22,9 +23,10 @@ export function CreateResourceForm({ categories }: CreateResourceFormProps) {
   const [capacity, setCapacity] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<ResourceStatus>(ResourceStatus.ACTIVE);
-  const [attributes, setAttributes] = useState("");
   const [requireBuffer, setRequireBuffer] = useState(false);
   const [bufferMinutes, setBufferMinutes] = useState(15);
+  const [supportGroupBooking, setSupportGroupBooking] = useState(true);
+  const [maxGroupCapacity, setMaxGroupCapacity] = useState<string>("6");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,18 +35,13 @@ export function CreateResourceForm({ categories }: CreateResourceFormProps) {
     e.preventDefault();
     setError(null);
 
-    let parsedAttributes: any = {};
-    if (attributes.trim()) {
-      try {
-        parsedAttributes = JSON.parse(attributes);
-      } catch (e) {
-        setError("Invalid JSON format in custom attributes.");
-        return;
-      }
-    }
-
+    const parsedAttributes: any = {};
     if (requireBuffer) {
       parsedAttributes.bufferMinutes = Number(bufferMinutes) || 15;
+    }
+    parsedAttributes.allowGroupBooking = Boolean(supportGroupBooking);
+    if (supportGroupBooking && maxGroupCapacity) {
+      parsedAttributes.maxGroupCapacity = Number(maxGroupCapacity) || 6;
     }
 
     setIsSubmitting(true);
@@ -63,14 +60,19 @@ export function CreateResourceForm({ categories }: CreateResourceFormProps) {
       setIsSubmitting(false);
 
       if (res.success) {
+        toast.queueSuccess(`Resource "${name}" created successfully!`);
         router.push("/admin");
         router.refresh();
       } else {
-        setError("Failed to create resource.");
+        const errText = "Failed to create resource.";
+        toast.error(errText);
+        setError(errText);
       }
     } catch (err: any) {
       setIsSubmitting(false);
-      setError(err?.message || "An unexpected error occurred.");
+      const errText = err?.message || "An unexpected error occurred.";
+      toast.error(errText);
+      setError(errText);
     }
   };
 
@@ -157,34 +159,19 @@ export function CreateResourceForm({ categories }: CreateResourceFormProps) {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-        <div>
-          <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-            Initial Status
-          </label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as ResourceStatus)}
-            className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-purple-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
-          >
-            <option value={ResourceStatus.ACTIVE}>ACTIVE (Immediately Bookable)</option>
-            <option value={ResourceStatus.MAINTENANCE}>MAINTENANCE (Temporarily Offline)</option>
-            <option value={ResourceStatus.INACTIVE}>INACTIVE (Deactivated)</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-            Custom Attributes (JSON, optional)
-          </label>
-          <input
-            type="text"
-            placeholder='{"screen": "4K TV", "whiteboard": true}'
-            value={attributes}
-            onChange={(e) => setAttributes(e.target.value)}
-            className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-purple-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
-          />
-        </div>
+      <div className="text-xs">
+        <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+          Initial Status
+        </label>
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value as ResourceStatus)}
+          className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-purple-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
+        >
+          <option value={ResourceStatus.ACTIVE}>ACTIVE (Immediately Bookable)</option>
+          <option value={ResourceStatus.MAINTENANCE}>MAINTENANCE (Temporarily Offline)</option>
+          <option value={ResourceStatus.INACTIVE}>INACTIVE (Deactivated)</option>
+        </select>
       </div>
 
       {/* Turnaround Buffer Setting */}
@@ -229,6 +216,53 @@ export function CreateResourceForm({ categories }: CreateResourceFormProps) {
               <option value={45}>45 minutes (A/V Gear Re-configuration)</option>
               <option value={60}>60 minutes (Heavy Cleaning / EV Fleet Recharge)</option>
             </select>
+          </div>
+        )}
+      </div>
+
+      {/* Story: Group Booking Support Configuration */}
+      <div className="rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4 space-y-3 dark:border-zinc-800 dark:bg-zinc-800/50">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <span className="text-lg">👥</span>
+            <div>
+              <label
+                htmlFor="crf-group-booking-toggle"
+                className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 block cursor-pointer"
+              >
+                Support Group Bookings (Teammate Invites)
+              </label>
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block mt-0.5">
+                Allow users to invite teammates when booking this resource.
+              </span>
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            id="crf-group-booking-toggle"
+            checked={supportGroupBooking}
+            onChange={(e) => setSupportGroupBooking(e.target.checked)}
+            className="mt-0.5 rounded border-zinc-300 text-purple-600 focus:ring-purple-500 cursor-pointer h-4 w-4"
+          />
+        </div>
+
+        {supportGroupBooking && (
+          <div className="pt-3 border-t border-zinc-200 dark:border-zinc-700/60 flex items-center justify-between gap-3">
+            <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium">
+              Maximum Group Capacity (People):
+            </span>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={2}
+                max={100}
+                value={maxGroupCapacity}
+                onChange={(e) => setMaxGroupCapacity(e.target.value)}
+                className="w-20 bg-white border border-zinc-300 rounded-lg text-xs text-zinc-800 px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-purple-500 dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-200 font-semibold text-center"
+                placeholder="e.g. 6"
+              />
+              <span className="text-xs text-zinc-500">people max</span>
+            </div>
           </div>
         )}
       </div>

@@ -36,7 +36,9 @@ import {
   simulateGhostRelease,
 } from "@/lib/actions/reservations";
 import { parseCheckInStatus, getCheckInEligibility, parseCancellationReason } from "@/lib/ghost-booking";
+import { parseGroupBooking } from "@/lib/group-booking";
 import { AddToCalendarButton } from "./AddToCalendarButton";
+import { toast } from "@/components/ui/toast";
 
 interface ReservationItem {
   id: string;
@@ -211,9 +213,11 @@ export function MyReservationsClient({
     try {
       const res = await checkInReservation(item.id);
       if (res.success) {
+        const successMsg = res.message || "Checked in successfully! Room secured.";
+        toast.success(successMsg);
         setStatusMessage({
           type: "success",
-          text: res.message || "Checked in successfully! Room secured.",
+          text: successMsg,
         });
         setReservations((prev) =>
           prev.map((r) =>
@@ -227,15 +231,19 @@ export function MyReservationsClient({
         );
         router.refresh();
       } else {
+        const errorMsg = res.error || "Failed to check in.";
+        toast.error(errorMsg);
         setStatusMessage({
           type: "error",
-          text: res.error || "Failed to check in.",
+          text: errorMsg,
         });
       }
     } catch (err: any) {
+      const errorMsg = err?.message || "An unexpected error occurred.";
+      toast.error(errorMsg);
       setStatusMessage({
         type: "error",
-        text: err?.message || "An unexpected error occurred.",
+        text: errorMsg,
       });
     } finally {
       setCheckingInId(null);
@@ -255,9 +263,11 @@ export function MyReservationsClient({
     try {
       const res = await simulateGhostRelease(item.id);
       if (res.success) {
+        const successMsg = res.message || "Simulated 15-minute no-show: reservation auto-released and freed!";
+        toast.success(successMsg);
         setStatusMessage({
           type: "success",
-          text: res.message || "Simulated 15-minute no-show: reservation auto-released and freed!",
+          text: successMsg,
         });
         setReservations((prev) =>
           prev.map((r) =>
@@ -272,15 +282,19 @@ export function MyReservationsClient({
         );
         router.refresh();
       } else {
+        const errorMsg = res.error || "Failed to simulate ghost release.";
+        toast.error(errorMsg);
         setStatusMessage({
           type: "error",
-          text: res.error || "Failed to simulate ghost release.",
+          text: errorMsg,
         });
       }
     } catch (err: any) {
+      const errorMsg = err?.message || "An unexpected error occurred.";
+      toast.error(errorMsg);
       setStatusMessage({
         type: "error",
-        text: err?.message || "An unexpected error occurred.",
+        text: errorMsg,
       });
     } finally {
       setSimulatingId(null);
@@ -295,21 +309,27 @@ export function MyReservationsClient({
     try {
       const res = await autoReleaseGhostBookings();
       if (res.success) {
+        const successMsg = res.message || "Sweeper finished successfully.";
+        toast.success(successMsg);
         setStatusMessage({
           type: "success",
-          text: res.message || "Sweeper finished successfully.",
+          text: successMsg,
         });
         router.refresh();
       } else {
+        const errorMsg = res.error || "Sweeper encountered an error.";
+        toast.error(errorMsg);
         setStatusMessage({
           type: "error",
-          text: res.error || "Sweeper encountered an error.",
+          text: errorMsg,
         });
       }
     } catch (err: any) {
+      const errorMsg = err?.message || "Failed to execute auto-release sweeper.";
+      toast.error(errorMsg);
       setStatusMessage({
         type: "error",
-        text: err?.message || "Failed to execute auto-release sweeper.",
+        text: errorMsg,
       });
     } finally {
       setIsSweeping(false);
@@ -321,9 +341,11 @@ export function MyReservationsClient({
     setReservations((prev) =>
       prev.map((r) => (r.id === updatedItem.id ? { ...r, ...updatedItem } : r))
     );
+    const msg = `Reservation "${updatedItem.title || "item"}" successfully rescheduled and updated.`;
+    toast.success(msg);
     setStatusMessage({
       type: "success",
-      text: "Reservation successfully rescheduled and updated.",
+      text: msg,
     });
     router.refresh();
   };
@@ -337,9 +359,11 @@ export function MyReservationsClient({
           : r
       )
     );
+    const msg = `Reservation for "${cancelledReservation.title}" has been cancelled.`;
+    toast.success(msg);
     setStatusMessage({
       type: "success",
-      text: `Reservation for "${cancelledReservation.title}" has been cancelled.`,
+      text: msg,
     });
     router.refresh();
   };
@@ -655,6 +679,12 @@ export function MyReservationsClient({
             const checkInInfo = parseCheckInStatus(item.notes || item.adminNotes);
             const cancellationInfo = parseCancellationReason(item.notes || item.adminNotes);
             const eligibility = getCheckInEligibility(item.startTime, item.endTime);
+            const groupInfo = parseGroupBooking(item.notes || item.adminNotes);
+            const isOrganizer = item.userId === currentUserId;
+            const isInvitedAttendee = !isOrganizer && (
+              groupInfo.invitedUserIds.includes(currentUserId || "") ||
+              (item.notes || "").includes(`[INVITED_USER:${currentUserId}]`)
+            );
 
             return (
               <div
@@ -676,6 +706,24 @@ export function MyReservationsClient({
                         <Badge variant="purple" size="sm">
                           🔒 Private
                         </Badge>
+                      )}
+
+                      {groupInfo.isGroupBooking && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-900">
+                          👥 Group Booking
+                        </span>
+                      )}
+
+                      {isInvitedAttendee && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-900">
+                          📩 Invited Attendee
+                        </span>
+                      )}
+
+                      {groupInfo.isGroupBooking && isOrganizer && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900">
+                          👑 Host
+                        </span>
                       )}
 
                       {/* Ghost Booking Badges & Cancellation Badges */}
@@ -783,6 +831,79 @@ export function MyReservationsClient({
                     <p className="mt-3 text-xs text-zinc-500 italic bg-zinc-50/50 p-2 rounded-lg dark:bg-zinc-800/40">
                       &quot;{checkInInfo.cleanNotes}&quot;
                     </p>
+                  )}
+
+                  {/* Group Booking & Attendees Showcase */}
+                  {groupInfo.isGroupBooking && (
+                    <div className="mt-3 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 p-3.5 text-xs text-indigo-950 dark:bg-indigo-950/30 dark:border-indigo-900/60 dark:text-indigo-200 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 font-bold text-indigo-900 dark:text-indigo-200">
+                          <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                          <span>Group Session Details</span>
+                        </div>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300">
+                          {groupInfo.attendees.length + 1} Participants
+                        </span>
+                      </div>
+
+                      {/* Organizer Host Info */}
+                      <div className="flex items-center gap-2 p-2 rounded-xl bg-white/80 dark:bg-zinc-900/80 border border-indigo-100 dark:border-indigo-950/50 shadow-2xs">
+                        <span className="text-sm">👑</span>
+                        <div className="min-w-0">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-600 dark:text-indigo-400 block">
+                            Host / Organizer:
+                          </span>
+                          <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                            {item.user?.name || (isOrganizer ? userName : "Host")}
+                          </span>
+                          {item.user?.department && (
+                            <span className="text-[11px] text-zinc-500 ml-1.5 font-normal">
+                              • {item.user.department}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Invited Attendees List */}
+                      {groupInfo.attendees.length > 0 && (
+                        <div className="space-y-1 pt-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block">
+                            Invited Teammates:
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {groupInfo.attendees.map((attendee) => (
+                              <span
+                                key={attendee.id}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium border shadow-2xs ${
+                                  attendee.id === currentUserId
+                                    ? "bg-teal-50 border-teal-300 text-teal-900 dark:bg-teal-950/80 dark:border-teal-700 dark:text-teal-200 font-bold"
+                                    : "bg-white border-zinc-200 text-zinc-800 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-200"
+                                }`}
+                              >
+                                <span className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[9px] font-bold">
+                                  {attendee.name.charAt(0).toUpperCase()}
+                                </span>
+                                <span>{attendee.name}</span>
+                                {attendee.id === currentUserId && (
+                                  <span className="text-[9px] px-1 py-0.2 rounded bg-teal-200 text-teal-900 dark:bg-teal-900 dark:text-teal-200">
+                                    You
+                                  </span>
+                                )}
+                                {attendee.department && (
+                                  <span className="text-[10px] opacity-75">({attendee.department})</span>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {isInvitedAttendee && (
+                        <p className="text-[11px] text-indigo-700 dark:text-indigo-300 italic pt-1">
+                          💡 You were invited to this group session. The booking is synced with your dashboard schedule.
+                        </p>
+                      )}
+                    </div>
                   )}
 
                   {/* Admin Cancellation Reason Notice Box for Affected Users */}
@@ -905,27 +1026,36 @@ export function MyReservationsClient({
                   {/* Only active upcoming reservations can be edited or cancelled */}
                   {!isCancelled && !isPast && (
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setReservationToEdit(item);
-                          setModalOpen(true);
-                        }}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 transition-colors cursor-pointer"
-                      >
-                        <Edit3 className="h-3.5 w-3.5 text-zinc-500" />
-                        <span>Edit Slot</span>
-                      </button>
+                      {isOrganizer || isAdmin ? (
+                        <>
+                          <button
+                            onClick={() => {
+                              setReservationToEdit(item);
+                              setModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 transition-colors cursor-pointer"
+                          >
+                            <Edit3 className="h-3.5 w-3.5 text-zinc-500" />
+                            <span>Edit Slot</span>
+                          </button>
 
-                      <button
-                        onClick={() => {
-                          setReservationToCancel(item);
-                          setCancelModalOpen(true);
-                        }}
-                        className="inline-flex items-center gap-1 rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 dark:bg-rose-950/60 dark:text-rose-300 transition-colors cursor-pointer"
-                      >
-                        <XCircle className="h-3.5 w-3.5" />
-                        <span>Cancel Booking</span>
-                      </button>
+                          <button
+                            onClick={() => {
+                              setReservationToCancel(item);
+                              setCancelModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 dark:bg-rose-950/60 dark:text-rose-300 transition-colors cursor-pointer"
+                          >
+                            <XCircle className="h-3.5 w-3.5" />
+                            <span>Cancel Booking</span>
+                          </button>
+                        </>
+                      ) : isInvitedAttendee ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 rounded-xl border border-indigo-200 dark:border-indigo-800">
+                          <Users className="h-3 w-3" />
+                          <span>Attending Group Session</span>
+                        </span>
+                      ) : null}
                     </div>
                   )}
 

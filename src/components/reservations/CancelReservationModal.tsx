@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cancelReservation } from "@/lib/actions/reservations";
 import { formatDate, formatTime } from "@/lib/utils";
+import { toast } from "@/components/ui/toast";
 
 interface CancelReservationModalProps {
   isOpen: boolean;
@@ -93,14 +94,19 @@ export function CancelReservationModal({
       setIsSubmitting(false);
 
       if (res.success && res.reservation) {
+        toast.success(`Reservation "${reservation.title}" has been cancelled.`);
         onSuccess(res.reservation);
         onClose();
       } else {
-        setError(res.error || "Failed to cancel reservation.");
+        const errText = res.error || "Failed to cancel reservation.";
+        toast.error(errText);
+        setError(errText);
       }
     } catch (err: any) {
       setIsSubmitting(false);
-      setError(err?.message || "An unexpected error occurred while cancelling.");
+      const errText = err?.message || "An unexpected error occurred while cancelling.";
+      toast.error(errText);
+      setError(errText);
     }
   };
 

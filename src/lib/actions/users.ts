@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, requireAuth } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 import { createUserSchema, CreateUserInput } from "@/lib/validations/user";
 import { Role } from "@prisma/client";
@@ -95,3 +95,28 @@ export async function getCompanyUsers() {
     },
   });
 }
+
+/**
+ * Story: Group Booking Teammate Discovery
+ * Retrieves normal users (non-admins) that can be selected for a group booking.
+ * Excludes administrators and the requesting user themselves.
+ */
+export async function getInvitableUsers() {
+  const currentUser = await requireAuth();
+
+  return await prisma.user.findMany({
+    where: {
+      role: Role.USER,
+      id: { not: currentUser.id },
+    },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      department: true,
+      avatarUrl: true,
+    },
+  });
+}
+

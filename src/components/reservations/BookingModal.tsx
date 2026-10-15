@@ -14,15 +14,23 @@ import {
   Lock,
   ArrowRight,
   Sparkles,
+  Users,
+  Search,
+  UserCheck,
 } from "lucide-react";
 import { createReservation, checkLiveConflict } from "@/lib/actions/reservations";
+import { getInvitableUsers } from "@/lib/actions/users";
 import { AddToCalendarActionGroup } from "./AddToCalendarButton";
+import { cleanUserNotes } from "@/lib/ghost-booking";
+import { toast } from "@/components/ui/toast";
 
 interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   resourceId: string;
   resourceName: string;
+  resourceAttributes?: any;
+  resourceCapacity?: number | null;
   initialStart?: Date;
   initialEnd?: Date;
   initialStartTime?: Date;
@@ -35,6 +43,8 @@ export function BookingModal({
   onClose,
   resourceId,
   resourceName,
+  resourceAttributes,
+  resourceCapacity,
   initialStart,
   initialEnd,
   initialStartTime,
@@ -53,6 +63,23 @@ export function BookingModal({
   const [notes, setNotes] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [autoRelease, setAutoRelease] = useState(true);
+
+  // Group Booking State (Teammate Invites without Admin)
+  const [isGroupBooking, setIsGroupBooking] = useState(false);
+  const [selectedAttendees, setSelectedAttendees] = useState<{
+    id: string;
+    name: string;
+    email: string;
+    department?: string | null;
+  }[]>([]);
+  const [invitableUsers, setInvitableUsers] = useState<{
+    id: string;
+    name: string;
+    email: string;
+    department?: string | null;
+  }[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const [smartSuggestions, setSmartSuggestions] = useState<{
@@ -85,7 +112,19 @@ export function BookingModal({
     endTime: Date;
     notes?: string | null;
     autoRelease?: boolean;
+    invitedAttendees?: { id: string; name: string; department?: string | null }[];
   } | null>(null);
+
+  // Fetch available normal users for group booking
+  useEffect(() => {
+    if (isOpen) {
+      getInvitableUsers()
+        .then((users) => {
+          if (users) setInvitableUsers(users);
+        })
+        .catch(() => {});
+    }
+  }, [isOpen]);
 
   // Initialize dates
   useEffect(() => {
@@ -121,11 +160,40 @@ export function BookingModal({
     setNotes("");
     setIsPrivate(false);
     setAutoRelease(true);
+    setIsGroupBooking(false);
+    setSelectedAttendees([]);
+    setUserSearchQuery("");
+    setIsDropdownOpen(false);
     setConflictWarning(null);
     setSmartSuggestions(null);
     setSubmitError(null);
     setConfirmedBooking(null);
   }, [initialStart, initialEnd, initialStartTime, initialEndTime, isOpen, resourceId, resourceName]);
+
+  // Group booking configuration and capacity thresholds
+  const allowGroupBooking = resourceAttributes?.allowGroupBooking !== false;
+  const maxPeopleAllowed =
+    typeof resourceAttributes?.maxGroupCapacity === "number" && resourceAttributes.maxGroupCapacity > 0
+      ? resourceAttributes.maxGroupCapacity
+      : typeof resourceCapacity === "number" && resourceCapacity > 0
+      ? resourceCapacity
+      : 6;
+  const isAtCapacity = selectedAttendees.length >= maxPeopleAllowed - 1;
+
+  // Filter available normal users for group booking dropdown
+  const filteredTeammates = useMemo(() => {
+    const query = userSearchQuery.trim().toLowerCase();
+    const selectedIds = new Set(selectedAttendees.map((a) => a.id));
+    return invitableUsers.filter((u) => {
+      if (selectedIds.has(u.id)) return false;
+      if (!query) return true;
+      return (
+        u.name.toLowerCase().includes(query) ||
+        u.email.toLowerCase().includes(query) ||
+        (u.department && u.department.toLowerCase().includes(query))
+      );
+    });
+  }, [invitableUsers, selectedAttendees, userSearchQuery]);
 
   // Check if currently selected date and time is in the past
   const isSelectedTimePast = useMemo(() => {
@@ -223,6 +291,15 @@ export function BookingModal({
       return;
     }
 
+    if (allowGroupBooking && selectedAttendees.length > maxPeopleAllowed - 1) {
+      setSubmitError(
+        `This resource permits a maximum of ${maxPeopleAllowed} people (including host). Please remove ${
+          selectedAttendees.length - (maxPeopleAllowed - 1)
+        } colleague(s).`
+      );
+      return;
+    }
+
     const [startH, startM] = startTimeStr.split(":").map(Number);
     const [endH, endM] = endTimeStr.split(":").map(Number);
 
@@ -233,6 +310,7 @@ export function BookingModal({
     setIsSubmitting(true);
 
     try {
+      const hasInvites = allowGroupBooking && selectedAttendees.length > 0;
       const result = await createReservation({
         resourceId: currentResourceId,
         title: title.trim(),
@@ -241,11 +319,13 @@ export function BookingModal({
         endTime: end,
         isPrivate,
         autoRelease,
+        invitedUserIds: hasInvites ? selectedAttendees.map((a) => a.id) : undefined,
       });
 
       setIsSubmitting(false);
 
       if (result.success && result.reservation) {
+        toast.success(`Reservation "${title.trim()}" booked successfully!`);
         if (onSuccess) onSuccess();
         // Transition directly to 1-Click "Add to Calendar" confirmation view
         setConfirmedBooking({
@@ -256,13 +336,18 @@ export function BookingModal({
           endTime: end,
           notes: notes.trim() || null,
           autoRelease,
+          invitedAttendees: hasInvites ? selectedAttendees : [],
         });
       } else {
-        setSubmitError(result.error || "Reservation failed.");
+        const errorMsg = result.error || "Reservation failed.";
+        toast.error(errorMsg);
+        setSubmitError(errorMsg);
       }
     } catch (err: any) {
       setIsSubmitting(false);
-      setSubmitError(err?.message || "An unexpected error occurred.");
+      const errorMsg = err?.message || "An unexpected error occurred.";
+      toast.error(errorMsg);
+      setSubmitError(errorMsg);
     }
   };
 
@@ -324,10 +409,32 @@ export function BookingModal({
                   {format(confirmedBooking.startTime, "h:mm a")} – {format(confirmedBooking.endTime, "h:mm a")}
                 </span>
               </div>
-              {confirmedBooking.notes && (
+              {cleanUserNotes(confirmedBooking.notes) && (
                 <p className="text-[11px] text-zinc-500 dark:text-zinc-400 italic pt-1 border-t border-zinc-200/60 dark:border-zinc-700/60">
-                  Notes: &quot;{confirmedBooking.notes}&quot;
+                  Notes: &quot;{cleanUserNotes(confirmedBooking.notes)}&quot;
                 </p>
+              )}
+
+              {confirmedBooking.invitedAttendees && confirmedBooking.invitedAttendees.length > 0 && (
+                <div className="pt-2 border-t border-zinc-200/60 dark:border-zinc-700/60 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+                    <Users className="h-3.5 w-3.5" />
+                    <span>Invited Teammates ({confirmedBooking.invitedAttendees.length}):</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {confirmedBooking.invitedAttendees.map((att) => (
+                      <span
+                        key={att.id}
+                        className="text-[11px] px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800"
+                      >
+                        {att.name} {att.department ? `(${att.department})` : ""}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-zinc-500">
+                    This reservation has been added to their personal dashboards.
+                  </p>
+                </div>
               )}
             </div>
 
@@ -644,6 +751,184 @@ export function BookingModal({
                   onChange={(e) => setNotes(e.target.value)}
                   className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
                 />
+              </div>
+
+              {/* Story: Group Booking (Invite Colleagues) */}
+              <div className="rounded-2xl border border-zinc-200 bg-slate-50/70 p-4 space-y-3 dark:border-zinc-800 dark:bg-zinc-800/40">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">👥</span>
+                    <label className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 block">
+                      Invite Colleagues (Group Booking)
+                    </label>
+                  </div>
+                  {allowGroupBooking ? (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-900/60 dark:text-teal-200 font-mono">
+                      Max {maxPeopleAllowed} people ({selectedAttendees.length + 1} / {maxPeopleAllowed})
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                      Single-User Only
+                    </span>
+                  )}
+                </div>
+
+                {!allowGroupBooking ? (
+                  <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold block">Individual Resource</span>
+                      <span className="text-[11px] text-amber-700 dark:text-amber-300">
+                        This resource is designated for individual use only and does not support group bookings or colleague invitations.
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                      Search and invite normal users. This booking will automatically appear on their personal dashboard schedule.
+                    </p>
+
+                    {/* Selected Attendees Chips */}
+                    {selectedAttendees.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between text-[11px] text-zinc-600 dark:text-zinc-400 font-medium">
+                          <span>Invited Colleagues ({selectedAttendees.length}):</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAttendees([])}
+                            className="text-rose-500 hover:text-rose-600 text-[10px] cursor-pointer"
+                          >
+                            Clear all
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedAttendees.map((attendee) => (
+                            <span
+                              key={attendee.id}
+                              className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-xs font-medium text-indigo-900 dark:bg-indigo-950/70 dark:border-indigo-800 dark:text-indigo-200 shadow-2xs"
+                            >
+                              <span className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[9px] font-bold">
+                                {attendee.name.charAt(0).toUpperCase()}
+                              </span>
+                              <span>{attendee.name}</span>
+                              {attendee.department && (
+                                <span className="text-[10px] opacity-75">({attendee.department})</span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSelectedAttendees((prev) => prev.filter((a) => a.id !== attendee.id))
+                                }
+                                className="rounded-full p-0.5 hover:bg-indigo-200 dark:hover:bg-indigo-800 text-indigo-700 dark:text-indigo-300 cursor-pointer"
+                                title={`Remove ${attendee.name}`}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Teammate Search Input with Dropdown (if not at capacity) */}
+                    {!isAtCapacity ? (
+                      <div className="relative pt-1">
+                        <label className="block text-[11px] font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                          Search Colleagues to Add:
+                        </label>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={userSearchQuery}
+                            onFocus={() => setIsDropdownOpen(true)}
+                            onChange={(e) => {
+                              setUserSearchQuery(e.target.value);
+                              setIsDropdownOpen(true);
+                            }}
+                            placeholder="Click or type colleague name, email, or department..."
+                            className="w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-8 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-teal-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 shadow-2xs cursor-pointer"
+                          />
+                          {userSearchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setUserSearchQuery("")}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Dropdown Menu */}
+                        {isDropdownOpen && (
+                          <div
+                            className="absolute left-0 right-0 z-30 mt-1 max-h-48 overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800 animate-in fade-in duration-150"
+                            onMouseDown={(e) => e.preventDefault()}
+                          >
+                            {filteredTeammates.length === 0 ? (
+                              <div className="p-3 text-center text-xs text-zinc-500">
+                                {userSearchQuery ? "No matching colleagues found." : "All eligible colleagues are already invited."}
+                              </div>
+                            ) : (
+                              filteredTeammates.map((u) => (
+                                <div
+                                  key={u.id}
+                                  onClick={() => {
+                                    if (selectedAttendees.length >= maxPeopleAllowed - 1) return;
+                                    setSelectedAttendees((prev) => [...prev, u]);
+                                    setUserSearchQuery("");
+                                    if (filteredTeammates.length <= 1) setIsDropdownOpen(false);
+                                  }}
+                                  className="flex items-center justify-between p-2 rounded-xl hover:bg-teal-50/70 dark:hover:bg-zinc-800/80 cursor-pointer transition-colors text-xs"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-7 h-7 rounded-full bg-teal-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                                      {u.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <span className="font-semibold text-zinc-900 dark:text-zinc-100 block truncate">
+                                        {u.name}
+                                      </span>
+                                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block truncate">
+                                        {u.email}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  {u.department && (
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 shrink-0 ml-2">
+                                      {u.department}
+                                    </span>
+                                  )}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded-xl bg-teal-50/80 dark:bg-teal-950/40 border border-teal-200/80 dark:border-teal-800/50 text-xs text-teal-800 dark:text-teal-300 text-center font-medium">
+                        Maximum group capacity of {maxPeopleAllowed} people reached for this resource (including host).
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400 pt-0.5">
+                      <span className="text-zinc-400 dark:text-zinc-500 text-[10px]">
+                        * Admin accounts are excluded. Only standard users can be invited.
+                      </span>
+                      {isDropdownOpen && (
+                        <button
+                          type="button"
+                          onClick={() => setIsDropdownOpen(false)}
+                          className="text-teal-600 hover:text-teal-700 dark:text-teal-400 font-semibold cursor-pointer text-xs"
+                        >
+                          Close list
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Private Reservation Toggle */}
