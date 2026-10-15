@@ -41,12 +41,19 @@ export function ResourceCard({ resource }: ResourceCardProps) {
             </span>
           )}
 
-          <Badge
-            variant={isAvailable ? "success" : "neutral"}
-            className="text-[10px]"
-          >
-            {isAvailable ? "Available" : resource.status}
-          </Badge>
+          <div className="flex items-center gap-1.5">
+            {Number((resource as any)?.attributes?.bufferMinutes) > 0 && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-900">
+                <span>🧹</span> {Number((resource as any).attributes.bufferMinutes)}m Buffer
+              </span>
+            )}
+            <Badge
+              variant={isAvailable ? "success" : "neutral"}
+              className="text-[10px]"
+            >
+              {isAvailable ? "Available" : resource.status}
+            </Badge>
+          </div>
         </div>
 
         {/* Title */}
