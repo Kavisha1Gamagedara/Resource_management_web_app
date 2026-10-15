@@ -73,8 +73,8 @@ export default async function AdminDashboardPage() {
     );
   }
 
-  // User is verified ADMIN: Query all resources and operations telemetry
-  const [resources, categories, operationsAnalytics] = await Promise.all([
+  // User is verified ADMIN: Query all resources, categories, operations telemetry, and company users
+  const [resources, categories, operationsAnalytics, companyUsers] = await Promise.all([
     prisma.resource.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -88,6 +88,21 @@ export default async function AdminDashboardPage() {
       orderBy: { name: "asc" },
     }),
     getOperationsAnalytics(),
+    prisma.user.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        department: true,
+        avatarUrl: true,
+        createdAt: true,
+        _count: {
+          select: { reservations: true },
+        },
+      },
+    }),
   ]);
 
   const activeCount = resources.filter((r) => r.status === "ACTIVE").length;
@@ -104,25 +119,18 @@ export default async function AdminDashboardPage() {
               <ShieldCheck className="h-4 w-4" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-              Facility & Resource Administration
+              Facility & User Administration Hub
             </h1>
             <Badge variant="purple" size="sm">
               ADMIN ONLY
             </Badge>
           </div>
           <p className="mt-1 text-xs text-zinc-500">
-            Fulfills Story 1: "As an admin, I can add, edit, and deactivate resources."
+            Comprehensive administration: Manage corporate resources, turnaround buffers, and onboard company users.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <Link
-            href="/admin/resources/new"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-purple-500 transition-colors"
-          >
-            <PlusCircle className="h-4 w-4" />
-            <span>Create New Resource</span>
-          </Link>
           <Link
             href="/resources"
             className="rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 transition-colors"
@@ -135,9 +143,9 @@ export default async function AdminDashboardPage() {
       {/* Admin Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-          <span className="text-xs font-medium text-zinc-500">Total Managed</span>
+          <span className="text-xs font-medium text-zinc-500">Managed Resources</span>
           <p className="mt-2 text-2xl font-bold text-zinc-900 dark:text-zinc-100">{resources.length}</p>
-          <span className="text-[11px] text-zinc-400">All registered facilities</span>
+          <span className="text-[11px] text-zinc-400">Rooms, A/V gear, fleet</span>
         </div>
 
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
@@ -147,23 +155,27 @@ export default async function AdminDashboardPage() {
         </div>
 
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-          <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Maintenance</span>
-          <p className="mt-2 text-2xl font-bold text-amber-700 dark:text-amber-400">{maintenanceCount}</p>
-          <span className="text-[11px] text-zinc-400">Temporarily offline</span>
+          <span className="text-xs font-medium text-purple-600 dark:text-purple-400">Company Personnel</span>
+          <p className="mt-2 text-2xl font-bold text-purple-700 dark:text-purple-400">{companyUsers.length}</p>
+          <span className="text-[11px] text-zinc-400">Registered team members</span>
         </div>
 
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-          <span className="text-xs font-medium text-zinc-500">Deactivated</span>
-          <p className="mt-2 text-2xl font-bold text-zinc-600 dark:text-zinc-300">{inactiveCount}</p>
-          <span className="text-[11px] text-zinc-400">Soft-deactivated items</span>
+          <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Offline / Maintenance</span>
+          <p className="mt-2 text-2xl font-bold text-amber-700 dark:text-amber-400">{maintenanceCount + inactiveCount}</p>
+          <span className="text-[11px] text-zinc-400">Deactivated or servicing</span>
         </div>
       </div>
 
       {/* Facility Utilization & Peak-Hour Analytics (RBAC: Admin View) */}
       <OperationsInsightsWidget analytics={operationsAnalytics} />
 
-      {/* Interactive Resources Management Table (Story 1: Add, Edit, Deactivate) */}
-      <AdminDashboardClient initialResources={resources} categories={categories} />
+      {/* Interactive Resources & User Management Hub */}
+      <AdminDashboardClient
+        initialResources={resources}
+        categories={categories}
+        initialUsers={companyUsers}
+      />
     </div>
   );
 }

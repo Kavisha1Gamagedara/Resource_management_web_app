@@ -13,6 +13,7 @@ import {
   updateResource,
   setResourceStatus,
 } from "@/lib/actions/resources";
+import { createUser } from "@/lib/actions/users";
 import {
   ShieldAlert,
   Plus,
@@ -27,17 +28,26 @@ import {
   Users,
   ShieldCheck,
   AlertTriangle,
+  UserPlus,
+  Mail,
+  KeyRound,
+  Briefcase,
+  Search,
+  CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
 import { ResourceStatus, Role } from "@prisma/client";
 
 interface AdminDashboardClientProps {
   initialResources: any[];
   categories: any[];
+  initialUsers?: any[];
 }
 
 export function AdminDashboardClient({
   initialResources,
   categories,
+  initialUsers = [],
 }: AdminDashboardClientProps) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -93,6 +103,92 @@ export function AdminDashboardClient({
     setFormError("");
     setIsModalOpen(true);
   };
+
+  // User Management State (ADMIN ONLY)
+  const [activeTab, setActiveTab] = React.useState<"resources" | "users">("resources");
+  const [isUserModalOpen, setIsUserModalOpen] = React.useState(false);
+  const [userSearch, setUserSearch] = React.useState("");
+  const [userRoleFilter, setUserRoleFilter] = React.useState<"ALL" | "ADMIN" | "USER">("ALL");
+
+  const [userName, setUserName] = React.useState("");
+  const [userEmail, setUserEmail] = React.useState("");
+  const [userPassword, setUserPassword] = React.useState("");
+  const [userRole, setUserRole] = React.useState<Role>(Role.USER);
+  const [userDepartment, setUserDepartment] = React.useState("Engineering");
+  const [customDepartment, setCustomDepartment] = React.useState("");
+  const [userAvatarUrl, setUserAvatarUrl] = React.useState("");
+  const [isUserSaving, setIsUserSaving] = React.useState(false);
+  const [userError, setUserError] = React.useState("");
+  const [userSuccess, setUserSuccess] = React.useState("");
+
+  const openAddUserModal = () => {
+    setUserName("");
+    setUserEmail("");
+    setUserPassword("prime" + Math.floor(1000 + Math.random() * 9000));
+    setUserRole(Role.USER);
+    setUserDepartment("Engineering");
+    setCustomDepartment("");
+    setUserAvatarUrl("");
+    setUserError("");
+    setUserSuccess("");
+    setIsUserModalOpen(true);
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserError("");
+    setUserSuccess("");
+    setIsUserSaving(true);
+
+    const finalDepartment =
+      userDepartment === "OTHER"
+        ? customDepartment.trim()
+        : userDepartment.trim();
+
+    if (userDepartment === "OTHER" && !finalDepartment) {
+      setUserError("Please specify the custom department name.");
+      setIsUserSaving(false);
+      return;
+    }
+
+    try {
+      const res = await createUser({
+        name: userName.trim(),
+        email: userEmail.trim().toLowerCase(),
+        password: userPassword,
+        role: userRole,
+        department: finalDepartment || undefined,
+        avatarUrl: userAvatarUrl.trim() || undefined,
+      });
+
+      if (!res.success) {
+        setUserError(res.error || "Failed to create user.");
+      } else {
+        setUserSuccess(`User account for "${userName}" created successfully!`);
+        setTimeout(() => {
+          setIsUserModalOpen(false);
+          router.refresh();
+        }, 1000);
+      }
+    } catch (err: any) {
+      setUserError(err?.message || "An unexpected error occurred.");
+    } finally {
+      setIsUserSaving(false);
+    }
+  };
+
+  const filteredUsers = React.useMemo(() => {
+    return (initialUsers || []).filter((u: any) => {
+      const q = userSearch.toLowerCase();
+      const matchesSearch =
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.department && u.department.toLowerCase().includes(q));
+      const matchesRole =
+        userRoleFilter === "ALL" || u.role === userRoleFilter;
+      return matchesSearch && matchesRole;
+    });
+  }, [initialUsers, userSearch, userRoleFilter]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,21 +292,65 @@ export function AdminDashboardClient({
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
             <ShieldAlert className="w-7 h-7 text-purple-400" />
-            Admin Resource Management Hub
+            Admin Operations & Management Hub
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Story 1: Add new shared equipment, update capacity/amenities, or deactivate resources.
+            Provision company personnel accounts, manage shared facilities, and configure turnaround buffer intervals.
           </p>
         </div>
 
-        <Button onClick={openAddModal} size="md" className="shrink-0 bg-purple-600 hover:bg-purple-500 border-purple-500/30">
-          <Plus className="w-4 h-4 mr-1.5" /> Add New Resource
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          {activeTab === "resources" ? (
+            <Button onClick={openAddModal} size="md" className="shrink-0 bg-purple-600 hover:bg-purple-500 border-purple-500/30">
+              <Plus className="w-4 h-4 mr-1.5" /> Add New Resource
+            </Button>
+          ) : (
+            <Button onClick={openAddUserModal} size="md" className="shrink-0 bg-emerald-600 hover:bg-emerald-500 border-emerald-500/30">
+              <UserPlus className="w-4 h-4 mr-1.5" /> Provision New User
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab("resources")}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center gap-2 transition-all ${
+            activeTab === "resources"
+              ? "bg-purple-600/20 text-purple-300 border border-purple-500/40 shadow-sm"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+          }`}
+        >
+          <Wrench className="w-4 h-4" />
+          <span>Shared Facilities & Gear</span>
+          <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+            {initialResources.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("users")}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center gap-2 transition-all ${
+            activeTab === "users"
+              ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Company Personnel & RBAC</span>
+          <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-800 text-emerald-300 font-mono">
+            {initialUsers.length}
+          </span>
+        </button>
       </div>
 
       {/* Resources Table / List */}
-      <div className="space-y-3">
-        {initialResources.map((res) => {
+      {activeTab === "resources" && (
+        <div className="space-y-3">
+          {initialResources.map((res) => {
           const isActive = res.status === ResourceStatus.ACTIVE;
 
           return (
@@ -312,7 +452,145 @@ export function AdminDashboardClient({
             </Card>
           );
         })}
-      </div>
+        </div>
+      )}
+
+      {/* Users / Personnel Directory Tab */}
+      {activeTab === "users" && (
+        <div className="space-y-4">
+          {/* Search & Filter Bar */}
+          <Card className="border-slate-800 bg-slate-900/60 p-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Search personnel by name, email, or department..."
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <select
+                  value={userRoleFilter}
+                  onChange={(e) => setUserRoleFilter(e.target.value as any)}
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                >
+                  <option value="ALL">All Roles ({(initialUsers || []).length})</option>
+                  <option value="ADMIN">Administrators Only</option>
+                  <option value="USER">Standard Members Only</option>
+                </select>
+
+                <Button
+                  onClick={openAddUserModal}
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-500 border-emerald-500/30 text-xs shrink-0"
+                >
+                  <UserPlus className="w-3.5 h-3.5 mr-1.5" /> New User
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          {/* Personnel Table / Card List */}
+          <div className="space-y-2.5">
+            {filteredUsers.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-slate-800 rounded-xl bg-slate-900/30 space-y-3">
+                <Users className="w-8 h-8 text-slate-600 mx-auto" />
+                <p className="text-sm text-slate-400">No personnel found matching your filter criteria.</p>
+                {userSearch && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setUserSearch("")}
+                    className="text-xs"
+                  >
+                    Clear Search Filter
+                  </Button>
+                )}
+              </div>
+            ) : (
+              filteredUsers.map((u: any) => {
+                const isAdminUser = u.role === Role.ADMIN;
+                const initials = u.name
+                  ? u.name
+                      .split(" ")
+                      .map((p: string) => p[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2)
+                  : "U";
+
+                return (
+                  <Card
+                    key={u.id}
+                    className="border-slate-800 bg-slate-900/80 p-4 hover:border-slate-700/80 transition-colors"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3.5">
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border ${
+                            isAdminUser
+                              ? "bg-purple-950/80 border-purple-700 text-purple-300"
+                              : "bg-emerald-950/80 border-emerald-800 text-emerald-300"
+                          }`}
+                        >
+                          {initials}
+                        </div>
+
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-white">
+                              {u.name}
+                            </span>
+                            {isAdminUser ? (
+                              <Badge variant="purple" size="sm" className="gap-1 font-semibold">
+                                <ShieldCheck className="w-3 h-3 text-purple-400" /> Admin
+                              </Badge>
+                            ) : (
+                              <Badge variant="teal" size="sm" className="gap-1 font-medium">
+                                <Users className="w-3 h-3 text-teal-400" /> Team Member
+                              </Badge>
+                            )}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                            <span className="flex items-center gap-1 text-slate-300">
+                              <Mail className="w-3 h-3 text-slate-500" />
+                              {u.email}
+                            </span>
+                            {u.department && (
+                              <>
+                                <span>•</span>
+                                <span className="flex items-center gap-1 text-slate-400">
+                                  <Briefcase className="w-3 h-3 text-slate-500" />
+                                  {u.department}
+                                </span>
+                              </>
+                            )}
+                            <span>•</span>
+                            <span className="text-slate-500">
+                              Joined {new Date(u.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 self-end sm:self-center text-xs text-slate-400">
+                        <span className="px-2.5 py-1 rounded bg-slate-950 border border-slate-800 text-slate-300 font-mono">
+                          {u._count?.reservations || 0} reservations
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Add / Edit Resource Modal */}
       {isModalOpen && (
@@ -487,6 +765,166 @@ export function AdminDashboardClient({
               </Button>
               <Button type="submit" isLoading={isSaving}>
                 {editingId ? "Save Changes" : "Create Resource"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Admin Provision New User Modal */}
+      {isUserModalOpen && (
+        <Modal
+          isOpen={true}
+          onClose={() => setIsUserModalOpen(false)}
+          title="Provision New Company Personnel"
+          description="Create a verified company user account with initial credentials and assign Role-Based Access Control (RBAC)."
+          maxWidth="md"
+        >
+          <form onSubmit={handleCreateUser} className="space-y-4">
+            {userError && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-950/60 border border-rose-800/80 text-rose-300 text-sm">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{userError}</span>
+              </div>
+            )}
+
+            {userSuccess && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 text-sm">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{userSuccess}</span>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">
+                Full Name *
+              </label>
+              <Input
+                placeholder="e.g. Maya Lin"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                required
+                minLength={2}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">
+                Corporate Email Address *
+              </label>
+              <Input
+                type="email"
+                placeholder="e.g. maya.lin@primewave.com"
+                value={userEmail}
+                onChange={(e) => setUserEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300">
+                  Role / Permissions (RBAC) *
+                </label>
+                <select
+                  value={userRole}
+                  onChange={(e) => setUserRole(e.target.value as Role)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                >
+                  <option value={Role.USER}>Standard Team Member</option>
+                  <option value={Role.ADMIN}>System Administrator</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300">
+                  Department
+                </label>
+                <select
+                  value={userDepartment}
+                  onChange={(e) => {
+                    setUserDepartment(e.target.value);
+                    if (e.target.value !== "OTHER") {
+                      setCustomDepartment("");
+                    }
+                  }}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                >
+                  <option value="Engineering">Engineering</option>
+                  <option value="Product & Design">Product & Design</option>
+                  <option value="Operations & Facilities">Operations & Facilities</option>
+                  <option value="Sales & Marketing">Sales & Marketing</option>
+                  <option value="Executive / HR">Executive / HR</option>
+                  <option value="Finance">Finance</option>
+                  <option value="OTHER">Other (Specify Custom)...</option>
+                </select>
+              </div>
+            </div>
+
+            {userDepartment === "OTHER" && (
+              <div className="space-y-1.5 p-3 rounded-lg bg-slate-950/70 border border-emerald-500/40">
+                <label className="text-xs font-semibold text-emerald-400 flex items-center justify-between">
+                  <span>Custom Department Name *</span>
+                  <span className="text-[10px] text-slate-400 font-normal">e.g. Legal, QA Testing, Customer Success</span>
+                </label>
+                <Input
+                  type="text"
+                  placeholder="Enter custom department name..."
+                  value={customDepartment}
+                  onChange={(e) => setCustomDepartment(e.target.value)}
+                  required={userDepartment === "OTHER"}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-300">
+                  Temporary Access Password *
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setUserPassword("prime" + Math.floor(1000 + Math.random() * 9000))
+                  }
+                  className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" /> Auto-Generate
+                </button>
+              </div>
+              <div className="relative">
+                <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Input
+                  type="text"
+                  placeholder="At least 6 characters"
+                  value={userPassword}
+                  onChange={(e) => setUserPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="pl-9 font-mono"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Encrypted via bcrypt with 10 salt rounds. Provide this password to the employee for first login.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setIsUserModalOpen(false)}
+                disabled={isUserSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                isLoading={isUserSaving}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white"
+              >
+                <UserPlus className="w-4 h-4 mr-1.5" /> Provision User
               </Button>
             </div>
           </form>
