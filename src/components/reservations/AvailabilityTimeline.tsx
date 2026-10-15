@@ -80,16 +80,16 @@ export function AvailabilityTimeline({
   };
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-5 backdrop-blur-md space-y-5">
+    <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-md space-y-5">
       {/* Date Navigation Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/90 dark:border-slate-800/80">
         <div className="flex items-center gap-2">
-          <CalendarIcon className="w-5 h-5 text-emerald-400" />
+          <CalendarIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
           <div>
-            <h4 className="text-base font-bold text-white">
+            <h4 className="text-base font-bold text-slate-900 dark:text-white">
               {format(selectedDate, "EEEE, MMMM d, yyyy")}
             </h4>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               {dayReservations.length === 0
                 ? "No reservations today · Full availability"
                 : `${dayReservations.length} reservation(s) scheduled`}
@@ -111,14 +111,14 @@ export function AvailabilityTimeline({
       </div>
 
       {!isResourceActive ? (
-        <div className="p-4 rounded-lg bg-amber-950/40 border border-amber-800/50 text-amber-300 text-sm text-center">
+        <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-800/50 dark:text-amber-300 text-sm text-center">
           ⚠️ This resource is currently inactive or undergoing maintenance. Bookings are temporarily paused.
         </div>
       ) : (
         <>
           {/* Buffer Information Notice */}
           {bufferMinutes > 0 && (
-            <div className="flex items-center gap-2.5 p-3 rounded-lg bg-amber-950/30 border border-amber-800/50 text-amber-300 text-xs">
+            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800/50 dark:text-amber-300 text-xs">
               <span className="text-base">🧹</span>
               <span>
                 <strong>Mandatory Turnaround Buffer:</strong> This facility enforces an automatic {bufferMinutes}-minute cleaning and reset window following each reservation.
@@ -129,7 +129,7 @@ export function AvailabilityTimeline({
           {/* Visual Timeline Bar */}
           <div className="space-y-2">
             {/* Hour Markers directly above timeline segments */}
-            <div className="grid grid-cols-12 text-[10px] sm:text-xs font-semibold text-slate-300 text-center select-none pb-1">
+            <div className="grid grid-cols-12 text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-300 text-center select-none pb-1">
               {hours.map((hour) => (
                 <div key={hour} className="truncate px-0.5">
                   <span className="hidden md:inline">{formatShortHour(hour)}</span>
@@ -139,7 +139,7 @@ export function AvailabilityTimeline({
             </div>
 
             {/* Continuous timeline bar */}
-            <div className="relative h-16 w-full bg-slate-950/90 rounded-xl border border-slate-700/80 overflow-hidden flex shadow-inner">
+            <div className="relative h-16 w-full bg-slate-100 rounded-xl border border-slate-200 dark:bg-slate-950/90 dark:border-slate-700/80 overflow-hidden flex shadow-inner">
               {/* Hour dividers & interactive hover indicators */}
               {hours.map((hour) => {
                 const slotStart = new Date(selectedDate);
@@ -153,13 +153,13 @@ export function AvailabilityTimeline({
                   return (
                     <div
                       key={hour}
-                      className="flex-1 border-r border-slate-800/80 h-full relative cursor-not-allowed select-none transition-colors flex flex-col justify-between p-1.5 bg-slate-950/90 opacity-40"
+                      className="flex-1 border-r border-slate-200 dark:border-slate-800/80 h-full relative cursor-not-allowed select-none transition-colors flex flex-col justify-between p-1.5 bg-slate-200/60 dark:bg-slate-950/90 opacity-60"
                       title={`Past time slot (${formatHourLabel(hour)}) - Bookings closed`}
                     >
-                      <span className="text-[10px] font-mono text-slate-600 line-through">
+                      <span className="text-[10px] font-mono text-slate-400 dark:text-slate-600 line-through">
                         {hour > 12 ? hour - 12 : hour}{hour >= 12 ? "p" : "a"}
                       </span>
-                      <span className="text-[9px] text-slate-600 font-medium">
+                      <span className="text-[9px] text-slate-400 dark:text-slate-600 font-medium">
                         Past
                       </span>
                     </div>
@@ -169,9 +169,9 @@ export function AvailabilityTimeline({
                 return (
                   <div
                     key={hour}
-                    className={`flex-1 border-r border-slate-700/60 h-full relative group cursor-pointer transition-colors flex flex-col justify-between p-1.5 ${
-                      isEven ? "bg-slate-900/40" : "bg-slate-950/40"
-                    } hover:bg-emerald-500/20`}
+                    className={`flex-1 border-r border-slate-200 dark:border-slate-700/60 h-full relative group cursor-pointer transition-colors flex flex-col justify-between p-1.5 ${
+                      isEven ? "bg-white/80 dark:bg-slate-900/40" : "bg-slate-50/80 dark:bg-slate-950/40"
+                    } hover:bg-emerald-500/15`}
                     onClick={() => {
                       if (onSelectSlot) {
                         onSelectSlot(slotStart, slotEnd);
@@ -179,10 +179,10 @@ export function AvailabilityTimeline({
                     }}
                     title={`Click to reserve ${formatHourLabel(hour)} – ${formatHourLabel(hour + 1)}`}
                   >
-                    <span className="text-[10px] font-mono text-slate-500 group-hover:text-emerald-300 font-medium">
+                    <span className="text-[10px] font-mono text-slate-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 font-medium">
                       {hour > 12 ? hour - 12 : hour}{hour >= 12 ? "p" : "a"}
                     </span>
-                    <span className="text-[9px] text-emerald-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
                       + Book
                     </span>
                   </div>
@@ -219,7 +219,7 @@ export function AvailabilityTimeline({
                 return (
                   <React.Fragment key={res.id}>
                     <div
-                      className="absolute top-1 bottom-1 rounded-lg bg-rose-600/90 border border-rose-400/90 text-white px-2 py-0.5 text-xs flex items-center justify-between shadow-md overflow-hidden z-10 transition-all hover:bg-rose-500"
+                      className="absolute top-1 bottom-1 rounded-lg bg-rose-500 border border-rose-400 text-white px-2 py-0.5 text-xs flex items-center justify-between shadow-xs overflow-hidden z-10 transition-all hover:bg-rose-600"
                       style={{
                         left: `${leftPercent}%`,
                         width: `${Math.max(widthPercent, 3)}%`,
@@ -233,7 +233,7 @@ export function AvailabilityTimeline({
 
                     {bufferMinutes > 0 && bufClampedEnd > bufClampedStart && (
                       <div
-                        className="absolute top-1.5 bottom-1.5 rounded-lg bg-amber-500/25 border border-dashed border-amber-400/80 text-amber-300 px-1 py-0.5 text-[10px] flex items-center justify-center font-medium overflow-hidden z-10 select-none shadow-sm"
+                        className="absolute top-1.5 bottom-1.5 rounded-lg bg-amber-400/30 border border-dashed border-amber-500 text-amber-900 dark:text-amber-300 px-1 py-0.5 text-[10px] flex items-center justify-center font-medium overflow-hidden z-10 select-none shadow-xs"
                         style={{
                           left: `${bufLeftPercent}%`,
                           width: `${Math.max(bufWidthPercent, 2)}%`,
@@ -249,19 +249,19 @@ export function AvailabilityTimeline({
             </div>
 
             {/* Timeline Legend */}
-            <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400 pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400 pt-1">
               <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-slate-900 border border-slate-700" />
-                  <span className="text-slate-300">Available Slot</span>
+                  <span className="w-3 h-3 rounded bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700" />
+                  <span className="text-slate-700 dark:text-slate-300">Available Slot</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-rose-600/90 border border-rose-400/90" />
-                  <span className="text-rose-300 font-medium">Booked Reservation</span>
+                  <span className="w-3 h-3 rounded bg-rose-500 border border-rose-400" />
+                  <span className="text-rose-700 dark:text-rose-300 font-medium">Booked Reservation</span>
                 </div>
                 {bufferMinutes > 0 && (
-                  <div className="flex items-center gap-1.5 text-amber-300 font-medium">
-                    <span className="w-3 h-3 rounded bg-amber-500/25 border border-dashed border-amber-400/80" />
+                  <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300 font-medium">
+                    <span className="w-3 h-3 rounded bg-amber-100 dark:bg-amber-500/25 border border-dashed border-amber-400" />
                     <span>🧹 {bufferMinutes}m Turnaround Buffer</span>
                   </div>
                 )}
@@ -273,16 +273,16 @@ export function AvailabilityTimeline({
           </div>
 
           {/* Hourly Availability Slots Grid */}
-          <div className="space-y-3 pt-4 border-t border-slate-800/80">
+          <div className="space-y-3 pt-4 border-t border-slate-200/90 dark:border-slate-800/80">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-emerald-400" />
-                <h5 className="text-xs sm:text-sm font-bold tracking-tight text-white">
+                <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <h5 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900 dark:text-white">
                   Daily Time Slots Overview ({format(selectedDate, "EEE, MMM d")})
                 </h5>
               </div>
-              <span className="text-[11px] text-slate-400">
-                Click any <span className="text-emerald-400 font-semibold">Available</span> card to pre-fill reservation time
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                Click any <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Available</span> card to pre-fill reservation time
               </span>
             </div>
 
@@ -298,18 +298,18 @@ export function AvailabilityTimeline({
                   return (
                     <div
                       key={hour}
-                      className="p-3 rounded-xl border border-slate-800/60 bg-slate-950/80 text-left opacity-35 cursor-not-allowed select-none flex flex-col justify-between min-h-[76px]"
+                      className="p-3 rounded-xl border border-slate-200 bg-slate-100/80 text-left opacity-40 cursor-not-allowed select-none flex flex-col justify-between min-h-[76px] dark:border-slate-800/60 dark:bg-slate-950/80"
                       title={`Past time slot (${formatHourLabel(hour)} – ${formatHourLabel(hour + 1)})`}
                     >
                       <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-bold text-slate-500 font-mono line-through">
+                        <span className="text-xs font-bold text-slate-400 dark:text-slate-500 font-mono line-through">
                           {formatShortHour(hour)}
                         </span>
-                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-900 text-slate-500 border border-slate-800">
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 border border-slate-300 dark:bg-slate-900 dark:text-slate-500 dark:border-slate-800">
                           Past
                         </span>
                       </div>
-                      <div className="mt-1 flex items-center justify-between text-[11px] text-slate-600">
+                      <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-600">
                         <span>Slot Closed</span>
                       </div>
                     </div>
@@ -340,22 +340,22 @@ export function AvailabilityTimeline({
                   return (
                     <div
                       key={hour}
-                      className="p-3 rounded-xl border border-rose-500/30 bg-rose-950/20 text-left transition-all flex flex-col justify-between min-h-[76px]"
+                      className="p-3 rounded-xl border border-rose-200 bg-rose-50 text-left transition-all flex flex-col justify-between min-h-[76px] dark:border-rose-500/30 dark:bg-rose-950/20"
                       title={`Booked: ${bookedRes.title} (${formatTime(bookedRes.startTime)} - ${formatTime(bookedRes.endTime)})`}
                     >
                       <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-bold text-rose-200 font-mono">
+                        <span className="text-xs font-bold text-rose-900 dark:text-rose-200 font-mono">
                           {formatShortHour(hour)}
                         </span>
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-950 border border-rose-800 text-rose-300 uppercase">
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 border border-rose-300 text-rose-800 uppercase dark:bg-rose-950 dark:border-rose-800 dark:text-rose-300">
                           Booked
                         </span>
                       </div>
                       <div className="mt-1">
-                        <div className="text-[11px] font-semibold text-rose-200 truncate">
+                        <div className="text-[11px] font-semibold text-rose-950 dark:text-rose-200 truncate">
                           {bookedRes.title}
                         </div>
-                        <div className="text-[10px] text-slate-400 truncate">
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                           {bookedRes.user?.name || "Team Member"}
                         </div>
                       </div>
@@ -367,20 +367,20 @@ export function AvailabilityTimeline({
                   return (
                     <div
                       key={hour}
-                      className="p-3 rounded-xl border border-amber-500/30 bg-amber-950/20 text-left flex flex-col justify-between min-h-[76px]"
+                      className="p-3 rounded-xl border border-amber-200 bg-amber-50 text-left flex flex-col justify-between min-h-[76px] dark:border-amber-500/30 dark:bg-amber-950/20"
                       title={`🧹 ${bufferMinutes}-minute turnaround cleaning & reset window`}
                     >
                       <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-bold text-amber-200 font-mono">
+                        <span className="text-xs font-bold text-amber-900 dark:text-amber-200 font-mono">
                           {formatShortHour(hour)}
                         </span>
                         <span className="text-xs">🧹</span>
                       </div>
                       <div className="mt-1">
-                        <div className="text-[11px] font-semibold text-amber-300">
+                        <div className="text-[11px] font-semibold text-amber-800 dark:text-amber-300">
                           {bufferMinutes}m Turnaround
                         </div>
-                        <div className="text-[10px] text-slate-400">
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
                           Cleaning & Reset
                         </div>
                       </div>
@@ -393,18 +393,18 @@ export function AvailabilityTimeline({
                     key={hour}
                     type="button"
                     onClick={() => onSelectSlot && onSelectSlot(slotStart, slotEnd)}
-                    className="p-3 rounded-xl border border-emerald-500/40 bg-emerald-950/20 hover:bg-emerald-900/30 hover:border-emerald-400 text-left transition-all duration-150 group cursor-pointer shadow-sm hover:shadow-emerald-950/50 flex flex-col justify-between min-h-[76px]"
+                    className="p-3 rounded-xl border border-slate-200 bg-white hover:border-emerald-500 hover:bg-emerald-50/60 text-left transition-all duration-150 group cursor-pointer shadow-xs hover:shadow-sm dark:border-emerald-500/40 dark:bg-emerald-950/20 dark:hover:bg-emerald-900/30 dark:hover:border-emerald-400 flex flex-col justify-between min-h-[76px]"
                     title={`Click to reserve ${startFormatted} – ${endFormatted}`}
                   >
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-xs font-bold text-white group-hover:text-emerald-300 font-mono">
+                      <span className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 dark:text-white dark:group-hover:text-emerald-300 font-mono">
                         {formatShortHour(hour)}
                       </span>
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
                     </div>
                     <div className="mt-1 flex items-center justify-between">
-                      <span className="text-[11px] text-emerald-400 font-medium">Available</span>
-                      <span className="text-emerald-300 font-bold text-[10px] group-hover:translate-x-0.5 transition-transform">
+                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Available</span>
+                      <span className="text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-300 font-bold text-[10px] group-hover:translate-x-0.5 transition-transform">
                         + Book →
                       </span>
                     </div>
@@ -416,11 +416,11 @@ export function AvailabilityTimeline({
 
           {/* Detailed Agenda List for the day */}
           <div className="space-y-2 pt-2">
-            <h5 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <h5 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Scheduled Bookings for this Day
             </h5>
             {dayReservations.length === 0 ? (
-              <div className="text-center py-6 border border-dashed border-slate-800 rounded-lg text-slate-500 text-xs">
+              <div className="text-center py-6 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 text-xs">
                 No bookings scheduled for {format(selectedDate, "MMM d")}. All slots are available!
               </div>
             ) : (
@@ -428,18 +428,18 @@ export function AvailabilityTimeline({
                 {dayReservations.map((res) => (
                   <div
                     key={res.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 gap-2"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 dark:bg-slate-950/60 dark:border-slate-800/80 gap-2"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="mt-0.5 p-1.5 rounded-md bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
+                      <div className="mt-0.5 p-1.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/40">
                         <Clock className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="text-sm font-semibold text-white">
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">
                           {res.title}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mt-0.5">
-                          <span className="text-emerald-400 font-medium">
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">
                             {formatTime(res.startTime)} – {formatTime(res.endTime)}
                           </span>
                           <span>•</span>
@@ -450,7 +450,7 @@ export function AvailabilityTimeline({
                           {bufferMinutes > 0 && (
                             <>
                               <span>•</span>
-                              <span className="text-amber-400/90 font-medium flex items-center gap-1">
+                              <span className="text-amber-700 dark:text-amber-400/90 font-medium flex items-center gap-1">
                                 <span>🧹</span>
                                 <span>{bufferMinutes}m buffer until {formatTime(new Date(new Date(res.endTime).getTime() + bufferMinutes * 60 * 1000))}</span>
                               </span>

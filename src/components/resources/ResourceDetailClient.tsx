@@ -81,36 +81,36 @@ export function ResourceDetailClient({ resource }: ResourceDetailClientProps) {
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Navigation Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-slate-400">
+      <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
         <Link
           href="/resources"
-          className="flex items-center gap-1 hover:text-white transition-colors"
+          className="flex items-center gap-1 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
         >
           <ChevronLeft className="w-4 h-4" /> Back to Catalog
         </Link>
         <span>/</span>
-        <span className="text-slate-300">{resource.category.name}</span>
+        <span className="text-slate-600 dark:text-slate-300">{resource.category.name}</span>
         <span>/</span>
-        <span className="text-white font-medium">{resource.name}</span>
+        <span className="text-slate-900 dark:text-white font-semibold">{resource.name}</span>
       </div>
 
       {/* Hero Resource Header */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-6 sm:p-8 backdrop-blur-md space-y-6">
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs space-y-6 dark:border-slate-800 dark:bg-slate-900/90">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200 uppercase tracking-wider dark:bg-teal-950/60 dark:text-emerald-400 dark:border-teal-900">
                 {resource.category.name}
               </span>
               {getStatusBadge(resource.status)}
             </div>
 
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               {resource.name}
             </h1>
 
             {resource.description && (
-              <p className="text-sm sm:text-base text-slate-300 max-w-3xl leading-relaxed">
+              <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-3xl leading-relaxed">
                 {resource.description}
               </p>
             )}
@@ -123,7 +123,7 @@ export function ResourceDetailClient({ resource }: ResourceDetailClientProps) {
               setSelectedSlot(null);
               setIsBookingOpen(true);
             }}
-            className="shrink-0 shadow-lg shadow-emerald-950/60"
+            className="shrink-0 shadow-sm shadow-emerald-950/20"
           >
             <Calendar className="w-4 h-4 mr-2" />
             {resource.status === "ACTIVE" ? "Reserve This Resource" : "Currently Unavailable"}
@@ -131,63 +131,63 @@ export function ResourceDetailClient({ resource }: ResourceDetailClientProps) {
         </div>
 
         {/* Resource Highlights */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-slate-800/80">
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-            <MapPin className="w-5 h-5 text-emerald-400 shrink-0" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800/80">
+          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 dark:bg-slate-950/60 dark:border-slate-800">
+            <MapPin className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <div>
-              <span className="text-[11px] text-slate-400 uppercase font-semibold block">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">
                 Facility Location
               </span>
-              <span className="text-sm font-semibold text-white">
+              <span className="text-sm font-semibold text-slate-900 dark:text-white">
                 {resource.location}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-            <Users className="w-5 h-5 text-cyan-400 shrink-0" />
+          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 dark:bg-slate-950/60 dark:border-slate-800">
+            <Users className="w-5 h-5 text-teal-600 dark:text-cyan-400 shrink-0" />
             <div>
-              <span className="text-[11px] text-slate-400 uppercase font-semibold block">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">
                 Capacity / Sizing
               </span>
-              <span className="text-sm font-semibold text-white">
+              <span className="text-sm font-semibold text-slate-900 dark:text-white">
                 {resource.capacity ? `${resource.capacity} people` : "Flexible / Equipment Unit"}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-            <Shield className="w-5 h-5 text-teal-400 shrink-0" />
+          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 dark:bg-slate-950/60 dark:border-slate-800">
+            <Shield className="w-5 h-5 text-teal-600 dark:text-teal-400 shrink-0" />
             <div>
-              <span className="text-[11px] text-slate-400 uppercase font-semibold block">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">
                 Booking Policy
               </span>
-              <span className="text-sm font-semibold text-white">
+              <span className="text-sm font-semibold text-slate-900 dark:text-white">
                 Instant Real-time Confirmation
               </span>
             </div>
           </div>
 
           {bufferMinutes > 0 ? (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-950/40 border border-amber-800/60">
+            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800/60">
               <span className="text-xl">🧹</span>
               <div>
-                <span className="text-[11px] text-amber-300 uppercase font-semibold block">
+                <span className="text-[11px] text-amber-800 dark:text-amber-300 uppercase font-semibold block">
                   Turnaround Buffer
                 </span>
-                <span className="text-sm font-semibold text-white">
+                <span className="text-sm font-semibold text-amber-950 dark:text-white">
                   {bufferMinutes}m Reset & Cleaning
                 </span>
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 dark:bg-slate-950/60 dark:border-slate-800">
               <span className="text-lg">⚡</span>
               <div>
-                <span className="text-[11px] text-slate-400 uppercase font-semibold block">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">
                   Turnaround Policy
                 </span>
-                <span className="text-sm font-semibold text-white">
+                <span className="text-sm font-semibold text-slate-900 dark:text-white">
                   Direct Back-to-Back Access
                 </span>
               </div>
@@ -198,8 +198,8 @@ export function ResourceDetailClient({ resource }: ResourceDetailClientProps) {
         {/* Specifications / Amenities Tags */}
         {resource.attributes && typeof resource.attributes === "object" && (
           <div className="space-y-2 pt-2">
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Tag className="w-3.5 h-3.5 text-emerald-400" /> Equipment & Included Amenities
+            <h4 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Tag className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Equipment & Included Amenities
             </h4>
             <div className="flex flex-wrap gap-2">
               {Object.entries(resource.attributes)
@@ -207,9 +207,9 @@ export function ResourceDetailClient({ resource }: ResourceDetailClientProps) {
                 .map(([key, val]) => (
                   <div
                     key={key}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800/90 border border-slate-700/60 text-xs text-slate-200 font-medium"
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs text-slate-800 font-medium dark:bg-slate-800/90 dark:border-slate-700/60 dark:text-slate-200"
                   >
-                    <span className="text-emerald-400 capitalize">{key}: </span>
+                    <span className="text-emerald-700 dark:text-emerald-400 capitalize">{key}: </span>
                     <span>{typeof val === "boolean" ? (val ? "Included" : "None") : String(val)}</span>
                   </div>
                 ))}
@@ -221,10 +221,10 @@ export function ResourceDetailClient({ resource }: ResourceDetailClientProps) {
       {/* Visual Availability Timeline & Schedule */}
       <div className="space-y-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Live Availability & Schedule
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             View booked vs. free slots. Click on any free slot to immediately begin a reservation.
           </p>
         </div>

@@ -513,7 +513,7 @@ export function BookingModal({
                   value={dateStr}
                   min={format(new Date(), "yyyy-MM-dd")}
                   onChange={(e) => setDateStr(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
+                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 [color-scheme:light] dark:[color-scheme:dark] dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>
 
@@ -522,7 +522,7 @@ export function BookingModal({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-teal-400" />
+                      <Clock className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                       <span>Start Time *</span>
                     </label>
                     <input
@@ -530,13 +530,13 @@ export function BookingModal({
                       required
                       value={startTimeStr}
                       onChange={(e) => setStartTimeStr(e.target.value)}
-                      className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-zinc-900 outline-none focus:border-teal-500 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 shadow-sm"
+                      className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-zinc-900 outline-none focus:border-teal-500 font-mono text-xs [color-scheme:light] dark:[color-scheme:dark] dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 shadow-sm"
                     />
                   </div>
 
                   <div>
                     <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-teal-400" />
+                      <Clock className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                       <span>End Time *</span>
                     </label>
                     <input
@@ -544,16 +544,16 @@ export function BookingModal({
                       required
                       value={endTimeStr}
                       onChange={(e) => setEndTimeStr(e.target.value)}
-                      className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-zinc-900 outline-none focus:border-teal-500 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 shadow-sm"
+                      className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-zinc-900 outline-none focus:border-teal-500 font-mono text-xs [color-scheme:light] dark:[color-scheme:dark] dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 shadow-sm"
                     />
                   </div>
                 </div>
 
                 {/* Quick Duration Shortcuts */}
                 <div className="space-y-1 pt-1">
-                  <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                    <span>Quick Duration:</span>
-                    <span className="text-[10px] text-slate-500">Auto-adjusts end time</span>
+                  <div className="flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
+                    <span className="font-medium text-zinc-700 dark:text-zinc-300">Quick Duration:</span>
+                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400">Auto-adjusts end time</span>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {[
@@ -574,7 +574,7 @@ export function BookingModal({
                           const endM = totalMins % 60;
                           setEndTimeStr(`${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`);
                         }}
-                        className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 transition-colors"
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 dark:text-zinc-300 dark:border-zinc-700/60 transition-colors cursor-pointer"
                       >
                         {dur.label}
                       </button>
@@ -584,7 +584,7 @@ export function BookingModal({
 
                 {/* Quick Standard Slot Presets */}
                 <div className="space-y-1 pt-1">
-                  <span className="text-[11px] text-zinc-400">Common Time Slots:</span>
+                  <span className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300">Common Time Slots:</span>
                   <div className="flex flex-wrap gap-1.5">
                     {[
                       { label: "9:00 - 10:00 AM", s: "09:00", e: "10:00" },
@@ -617,10 +617,10 @@ export function BookingModal({
                           }}
                           className={`px-2.5 py-1 rounded-lg text-[10px] font-mono transition-colors ${
                             isPresetPast
-                              ? "opacity-30 cursor-not-allowed line-through bg-zinc-900 border border-zinc-800 text-zinc-500"
+                              ? "opacity-40 cursor-not-allowed line-through bg-slate-100 border border-slate-200 text-slate-400 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-500"
                               : startTimeStr === preset.s && endTimeStr === preset.e
-                              ? "bg-teal-500/20 text-teal-300 border border-teal-500/50 font-bold cursor-pointer"
-                              : "bg-zinc-800/60 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/40 cursor-pointer"
+                              ? "bg-teal-50 text-teal-800 border border-teal-500 font-bold dark:bg-teal-500/20 dark:text-teal-300 dark:border-teal-500/50 cursor-pointer"
+                              : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 dark:bg-zinc-800/60 dark:hover:bg-zinc-700 dark:text-zinc-300 dark:border-zinc-700/40 cursor-pointer shadow-2xs"
                           }`}
                           title={isPresetPast ? "Past time slot (unavailable)" : `Select ${preset.label}`}
                         >

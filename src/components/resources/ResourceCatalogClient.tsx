@@ -145,10 +145,10 @@ export function ResourceCatalogClient({
       {/* Page Title & Search Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             Resource Catalog
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
             Browse and reserve meeting rooms, A/V gear, hardware labs, and vehicles
           </p>
         </div>
@@ -166,15 +166,15 @@ export function ResourceCatalogClient({
       </div>
 
       {/* Filter Tabs: Categories and Status */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
         {/* Category Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
           <button
             onClick={() => handleCategoryChange("ALL")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
               selectedCategory === "ALL"
-                ? "bg-emerald-600 text-white shadow-md shadow-emerald-950/40"
-                : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white"
+                ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/30"
+                : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800/80 dark:border-transparent dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
             }`}
           >
             All Resources ({initialResources.length})
@@ -183,10 +183,10 @@ export function ResourceCatalogClient({
             <button
               key={cat.id}
               onClick={() => handleCategoryChange(cat.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 selectedCategory === cat.id
-                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-950/40"
-                  : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white"
+                  ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/30"
+                  : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800/80 dark:border-transparent dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
               }`}
             >
               {cat.name}
@@ -197,11 +197,11 @@ export function ResourceCatalogClient({
         {/* Status Dropdown Filter */}
         <div className="flex items-center gap-2 shrink-0">
           <Filter className="w-3.5 h-3.5 text-slate-400" />
-          <span className="text-xs text-slate-400">Status:</span>
+          <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Status:</span>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="bg-white border border-slate-200 rounded-xl text-xs text-slate-800 px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 cursor-pointer"
           >
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active Only</option>
@@ -213,10 +213,10 @@ export function ResourceCatalogClient({
 
       {/* Resource Grid */}
       {filteredResources.length === 0 ? (
-        <div className="text-center py-16 border border-dashed border-slate-800 rounded-2xl space-y-3">
-          <Search className="w-10 h-10 text-slate-600 mx-auto" />
-          <h3 className="text-base font-semibold text-white">No resources matched your filters</h3>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+        <div className="text-center py-16 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl space-y-3 bg-white/50 dark:bg-slate-900/40">
+          <Search className="w-10 h-10 text-slate-400 dark:text-slate-600 mx-auto" />
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white">No resources matched your filters</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
             Try resetting your search query or switching to another category.
           </p>
           <Button
@@ -240,12 +240,12 @@ export function ResourceCatalogClient({
             return (
               <Card
                 key={res.id}
-                className="group border-slate-800/90 bg-slate-900/80 hover:border-slate-700 hover:bg-slate-900 flex flex-col justify-between transition-all duration-200"
+                className="group border border-slate-200/90 bg-white hover:border-teal-500/40 hover:shadow-md flex flex-col justify-between transition-all duration-200 dark:border-slate-800/90 dark:bg-slate-900/80 dark:hover:border-slate-700 dark:hover:bg-slate-900"
               >
                 <div className="p-5 space-y-3">
                   {/* Category and Status Badge */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">
+                    <span className="text-[11px] font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200 uppercase tracking-wider dark:bg-teal-950/60 dark:text-emerald-400 dark:border-teal-900">
                       {res.category.name}
                     </span>
                     {getStatusBadge(res.status)}
@@ -253,20 +253,20 @@ export function ResourceCatalogClient({
 
                   {/* Resource Name and Description */}
                   <div>
-                    <Link href={`/resources/${res.id}`} className="group-hover:text-emerald-400 transition-colors">
-                      <h3 className="text-lg font-bold text-white leading-snug">
+                    <Link href={`/resources/${res.id}`} className="group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-snug">
                         {res.name}
                       </h3>
                     </Link>
                     {res.description && (
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
                         {res.description}
                       </p>
                     )}
                   </div>
 
                   {/* Meta: Location & Capacity */}
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 pt-1">
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-300 pt-1">
                     <span className="flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       {res.location}
@@ -283,7 +283,7 @@ export function ResourceCatalogClient({
                   {res.attributes && typeof res.attributes === "object" && (
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       {Number((res.attributes as any)?.bufferMinutes) > 0 && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-950/60 text-[11px] text-amber-300 border border-amber-800/60 font-medium">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-[11px] text-amber-800 border border-amber-200 font-medium dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60">
                           <span>🧹</span> {(res.attributes as any).bufferMinutes}m buffer
                         </span>
                       )}
@@ -293,7 +293,7 @@ export function ResourceCatalogClient({
                         .map(([k, v]) => (
                           <span
                             key={k}
-                            className="px-2 py-0.5 rounded bg-slate-800/80 text-[11px] text-slate-300 border border-slate-700/50"
+                            className="px-2 py-0.5 rounded-md bg-slate-100 text-[11px] text-slate-700 border border-slate-200 dark:bg-slate-800/80 dark:text-slate-300 dark:border-slate-700/50"
                           >
                             {typeof v === "boolean" ? k : `${k}: ${String(v)}`}
                           </span>
@@ -302,17 +302,17 @@ export function ResourceCatalogClient({
                   )}
 
                   {/* Next Booking Slot Preview */}
-                  <div className="pt-2 border-t border-slate-800/60">
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60">
                     {nextBooking ? (
-                      <div className="flex items-center gap-2 text-xs text-amber-300/90 bg-amber-950/30 p-2 rounded-lg border border-amber-900/40">
-                        <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <div className="flex items-center gap-2 text-xs text-amber-900 bg-amber-50/80 p-2 rounded-xl border border-amber-200 dark:bg-amber-950/30 dark:text-amber-300/90 dark:border-amber-900/40">
+                        <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
                         <span className="truncate">
                           Next: {nextBooking.title} ({formatTime(nextBooking.startTime)} – {formatTime(nextBooking.endTime)})
                         </span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/20 p-2 rounded-lg border border-emerald-900/30">
-                        <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                      <div className="flex items-center gap-2 text-xs text-emerald-800 bg-emerald-50/80 p-2 rounded-xl border border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                         <span>No upcoming bookings · Available now</span>
                       </div>
                     )}
@@ -320,7 +320,7 @@ export function ResourceCatalogClient({
                 </div>
 
                 {/* Card Actions */}
-                <div className="p-5 pt-0 border-t border-slate-800/60 mt-2 flex items-center justify-between gap-2">
+                <div className="p-5 pt-0 border-t border-slate-100 dark:border-slate-800/60 mt-2 flex items-center justify-between gap-2">
                   <Link href={`/resources/${res.id}`} className="w-1/2">
                     <Button variant="outline" size="sm" className="w-full text-xs">
                       <Calendar className="w-3.5 h-3.5 mr-1" /> Schedule

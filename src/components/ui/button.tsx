@@ -16,17 +16,17 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variants = {
       primary:
-        "bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-950/40 border border-emerald-500/30",
+        "bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm shadow-emerald-950/20 border border-emerald-500/30",
       secondary:
-        "bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700/60 shadow-sm",
+        "bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 shadow-2xs dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 dark:border-slate-700/60 dark:shadow-sm",
       outline:
-        "bg-transparent border border-slate-700 text-slate-200 hover:bg-slate-800/80 hover:text-white",
+        "bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900 shadow-2xs dark:bg-transparent dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-white dark:shadow-none",
       ghost:
-        "bg-transparent hover:bg-slate-800/60 text-slate-300 hover:text-white",
+        "bg-transparent hover:bg-slate-100 text-slate-600 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:text-slate-300 dark:hover:text-white",
       destructive:
-        "bg-rose-600/90 hover:bg-rose-600 text-white shadow-md shadow-rose-950/40 border border-rose-500/30",
+        "bg-rose-600 hover:bg-rose-500 text-white shadow-sm shadow-rose-950/20 border border-rose-500/30",
       subtle:
-        "bg-emerald-950/40 text-emerald-400 border border-emerald-800/50 hover:bg-emerald-900/40",
+        "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/50 dark:hover:bg-emerald-900/40",
     };
 
     const sizes = {

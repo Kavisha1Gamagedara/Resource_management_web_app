@@ -2,7 +2,7 @@ import Link from "next/link";
 import prisma from "@/lib/db";
 import { ResourceCard } from "@/components/resources/ResourceCard";
 import { Badge } from "@/components/ui/Badge";
-import { formatTimeRange } from "@/lib/utils";
+import { formatTimeRange, formatDate } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/auth";
 import {
   Building2,
@@ -19,6 +19,7 @@ import {
 export default async function HomePage() {
   const user = await getCurrentUser();
   const isAdmin = user?.role === "ADMIN";
+  const now = new Date();
 
   // Query live summary statistics from database
   const [
@@ -32,7 +33,7 @@ export default async function HomePage() {
   ] = await Promise.all([
     prisma.resource.count(),
     prisma.category.count(),
-    prisma.reservation.count({ where: { status: "CONFIRMED" } }),
+    prisma.reservation.count({ where: { status: "CONFIRMED", endTime: { gte: now } } }),
     prisma.user.count(),
     prisma.category.findMany({
       include: {
@@ -56,10 +57,12 @@ export default async function HomePage() {
     }),
     // RBAC: Only admin sees all organizational reservations.
     // Regular users only see what is related to them (their personal bookings).
+    // Filters strictly for upcoming bookings where endTime >= now
     prisma.reservation.findMany({
       take: 6,
       where: {
         status: "CONFIRMED",
+        endTime: { gte: now },
         ...(isAdmin ? {} : { userId: user?.id || "__UNAUTHENTICATED__" }),
       },
       orderBy: { startTime: "asc" },
@@ -79,11 +82,6 @@ export default async function HomePage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-900 to-teal-950 p-8 sm:p-12 lg:p-14 text-white shadow-xl">
         <div className="relative z-10 max-w-4xl space-y-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-xs font-medium text-teal-300 backdrop-blur-sm">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>PrimeWave Lab Technical Assessment</span>
-          </div>
-
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight">
             Centralized Resource Reservation Hub
           </h1>
@@ -299,6 +297,10 @@ export default async function HomePage() {
                       </span>
                       <span>•</span>
                       <span>{res.resource.location}</span>
+                      <span>•</span>
+                      <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                        {formatDate(res.startTime)}
+                      </span>
                       <span>•</span>
                       <span>
                         {formatTimeRange(res.startTime, res.endTime)}
