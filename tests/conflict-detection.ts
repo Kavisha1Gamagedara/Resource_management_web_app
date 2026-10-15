@@ -179,51 +179,50 @@ async function runTests() {
     });
     assert(!pastValidation.success, "Test 9: Past Time Booking Rejection", "Past reservation correctly rejected by schema");
 
-    // 10. Pending Private Reservation Holds Slot (Privacy & Approval Workflow)
+    // 10. Confirmed Reservation Holds Slot
     const privateSlotStart = new Date(testDay);
     privateSlotStart.setHours(14, 0, 0, 0); // 2:00 PM
     const privateSlotEnd = new Date(testDay);
     privateSlotEnd.setHours(15, 0, 0, 0);   // 3:00 PM
 
-    const pendingPrivateBooking = await prisma.reservation.create({
+    const confirmedBooking2 = await prisma.reservation.create({
       data: {
         title: "Confidential Project Brief",
         resourceId: testResource.id,
         userId: user.id,
         startTime: privateSlotStart,
         endTime: privateSlotEnd,
-        status: ReservationStatus.PENDING,
-        isPrivate: true,
+        status: ReservationStatus.CONFIRMED,
       },
     });
 
-    // Attempt to book the exact same slot while pending approval
-    const conflictPending = await findConflict(prisma, {
+    // Attempt to book the exact same slot while confirmed
+    const conflictHeld = await findConflict(prisma, {
       resourceId: testResource.id,
       startTime: privateSlotStart,
       endTime: privateSlotEnd,
     });
     assert(
-      conflictPending !== null && conflictPending.status === ReservationStatus.PENDING,
-      "Test 10: Pending Private Reservation Holds Slot",
-      "Slot successfully held while pending administrator review"
+      conflictHeld !== null && conflictHeld.status === ReservationStatus.CONFIRMED,
+      "Test 10: Confirmed Reservation Holds Slot",
+      "Slot successfully held"
     );
 
-    // 11. Declined Reservation Frees Slot Immediately
+    // 11. Cancelled Reservation Frees Slot Immediately (Story 4)
     await prisma.reservation.update({
-      where: { id: pendingPrivateBooking.id },
-      data: { status: ReservationStatus.DECLINED },
+      where: { id: confirmedBooking2.id },
+      data: { status: ReservationStatus.CANCELLED },
     });
 
-    const conflictAfterDecline = await findConflict(prisma, {
+    const conflictAfterCancel = await findConflict(prisma, {
       resourceId: testResource.id,
       startTime: privateSlotStart,
       endTime: privateSlotEnd,
     });
     assert(
-      conflictAfterDecline === null,
-      "Test 11: Declined Reservation Releases Slot Immediately",
-      "Slot freed immediately after admin decline"
+      conflictAfterCancel === null,
+      "Test 11: Cancelled Reservation Releases Slot Immediately",
+      "Slot freed immediately after cancellation"
     );
 
     // 12. Smart Next Available Slot Recommendation

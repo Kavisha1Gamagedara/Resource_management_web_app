@@ -32,9 +32,7 @@ export async function findConflict(
   return await tx.reservation.findFirst({
     where: {
       resourceId,
-      status: {
-        in: [ReservationStatus.CONFIRMED, ReservationStatus.PENDING],
-      },
+      status: ReservationStatus.CONFIRMED,
       // If editing, exclude the current reservation itself from collision detection
       ...(excludeReservationId
         ? { id: { not: excludeReservationId } }
@@ -72,11 +70,6 @@ export function formatConflictMessage(conflictingReservation: {
   const organizer = conflictingReservation.user?.name
     ? ` by ${conflictingReservation.user.name}`
     : "";
-
-  if (conflictingReservation.status === ReservationStatus.PENDING) {
-    const titleText = conflictingReservation.isPrivate ? "Private Booking" : conflictingReservation.title;
-    return `Conflict detected: Time overlaps with "${titleText}" (${timeSlot}${organizer}), which is currently pending administrator approval. Please choose a different time slot.`;
-  }
 
   const titleText = conflictingReservation.isPrivate ? "Private Reservation" : conflictingReservation.title;
   return `Conflict detected: Time overlaps with "${titleText}" (${timeSlot}${organizer}). Please choose a different time slot.`;
@@ -125,7 +118,7 @@ export async function findSmartAlternatives(
     const activeBookings = await prismaClient.reservation.findMany({
       where: {
         resourceId: params.resourceId,
-        status: { in: [ReservationStatus.CONFIRMED, ReservationStatus.PENDING] },
+        status: ReservationStatus.CONFIRMED,
         ...(params.excludeReservationId ? { id: { not: params.excludeReservationId } } : {}),
         startTime: { lt: dayEnd },
         endTime: { gt: params.startTime },
@@ -182,7 +175,7 @@ export async function findSmartAlternatives(
       const conflictOnSibling = await prismaClient.reservation.findFirst({
         where: {
           resourceId: sibling.id,
-          status: { in: [ReservationStatus.CONFIRMED, ReservationStatus.PENDING] },
+          status: ReservationStatus.CONFIRMED,
           AND: [
             { startTime: { lt: params.endTime } },
             { endTime: { gt: params.startTime } },
