@@ -1,0 +1,53 @@
+// PrimeWave Lab - Resource Reservation Management System
+// Entity Relationship Diagram (dbdiagram.io / DBML)
+// Copy and paste this code at https://dbdiagram.io to generate your shareable link.
+
+Table User {
+  id varchar [pk]
+  email varchar [unique, not null]
+  name varchar [not null]
+  passwordHash varchar [not null]
+  role varchar [not null, note: 'USER | ADMIN']
+  department varchar [note: 'Engineering, Product, Design, Operations']
+  avatarUrl varchar
+  createdAt timestamp [default: `now()`]
+  updatedAt timestamp
+}
+
+Table Category {
+  id varchar [pk]
+  name varchar [unique, not null]
+  slug varchar [unique, not null]
+  description text
+}
+
+Table Resource {
+  id varchar [pk]
+  name varchar [not null]
+  description text
+  categoryId varchar [not null, ref: > Category.id]
+  location varchar [not null]
+  capacity integer
+  status varchar [not null, default: 'ACTIVE', note: 'ACTIVE | INACTIVE | MAINTENANCE']
+  attributes json
+  createdAt timestamp [default: `now()`]
+  updatedAt timestamp
+}
+
+Table Reservation {
+  id varchar [pk]
+  title varchar [not null]
+  notes text
+  startTime timestamp [not null]
+  endTime timestamp [not null]
+  status varchar [not null, default: 'CONFIRMED', note: 'CONFIRMED | CANCELLED | COMPLETED']
+  userId varchar [not null, ref: > User.id]
+  resourceId varchar [not null, ref: > Resource.id]
+  createdAt timestamp [default: `now()`]
+  updatedAt timestamp
+
+  indexes {
+    (resourceId, startTime, endTime)
+    (userId, startTime)
+  }
+}
