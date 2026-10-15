@@ -81,18 +81,18 @@ export default async function HomePage() {
   return (
     <div className="space-y-12">
       {/* Hero Section */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-900 to-teal-950 p-8 sm:p-12 text-white shadow-xl">
-        <div className="relative z-10 max-w-3xl space-y-4">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-900 to-teal-950 p-8 sm:p-12 lg:p-14 text-white shadow-xl">
+        <div className="relative z-10 max-w-4xl space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-xs font-medium text-teal-300 backdrop-blur-sm">
             <Sparkles className="h-3.5 w-3.5" />
             <span>PrimeWave Lab Technical Assessment</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight">
             Centralized Resource Reservation Hub
           </h1>
 
-          <p className="text-sm sm:text-base text-zinc-300 leading-relaxed max-w-2xl">
+          <p className="text-sm sm:text-base lg:text-lg text-zinc-300 leading-relaxed max-w-3xl">
             Streamline your organization&apos;s shared facilities, A/V gear, engineering labs,
             and company vehicles with guaranteed conflict prevention and clear visibility.
           </p>
@@ -226,7 +226,7 @@ export default async function HomePage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
           {recentResources.map((resource) => (
             <ResourceCard key={resource.id} resource={resource} />
           ))}
