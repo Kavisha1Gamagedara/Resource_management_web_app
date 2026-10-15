@@ -1,369 +1,374 @@
 import { PrismaClient, Role, ResourceStatus, ReservationStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { addDays, setHours, setMinutes, startOfDay } from "date-fns";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Starting PrimeWave database seed...");
+  console.log("🌱 Starting database seeding...");
 
-  // 1. Password hash for demo users
-  const defaultPasswordHash = await bcrypt.hash("password123", 10);
-  const adminPasswordHash = await bcrypt.hash("admin123", 10);
+  // Clear existing data in reverse order of foreign key dependencies
+  await prisma.reservation.deleteMany();
+  await prisma.resource.deleteMany();
+  await prisma.category.deleteMany();
+  await prisma.user.deleteMany();
 
-  // 2. Upsert Users
-  const usersData = [
-    {
+  console.log("🧹 Cleaned up existing database records.");
+
+  // 1. Create Users
+  const adminPasswordHash = bcrypt.hashSync("admin123", 10);
+  const userPasswordHash = bcrypt.hashSync("user123", 10);
+
+  const admin = await prisma.user.create({
+    data: {
       email: "admin@primewave.com",
       name: "Admin User",
       passwordHash: adminPasswordHash,
       role: Role.ADMIN,
-      department: "IT & Operations",
+      department: "Operations",
       avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
     },
-    {
+  });
+
+  const sarah = await prisma.user.create({
+    data: {
       email: "sarah@primewave.com",
       name: "Sarah Perera",
-      passwordHash: defaultPasswordHash,
+      passwordHash: userPasswordHash,
       role: Role.USER,
       department: "Engineering",
       avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
     },
-    {
+  });
+
+  const alex = await prisma.user.create({
+    data: {
       email: "alex@primewave.com",
       name: "Alex Fernando",
-      passwordHash: defaultPasswordHash,
+      passwordHash: userPasswordHash,
       role: Role.USER,
-      department: "Product Management",
+      department: "Product",
       avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
     },
-    {
-      email: "priyantha@primewave.com",
-      name: "Priyantha Dias",
-      passwordHash: defaultPasswordHash,
+  });
+
+  const emily = await prisma.user.create({
+    data: {
+      email: "emily@primewave.com",
+      name: "Emily Chen",
+      passwordHash: userPasswordHash,
       role: Role.USER,
-      department: "Design & UX",
+      department: "Design",
+      avatarUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80",
+    },
+  });
+
+  const david = await prisma.user.create({
+    data: {
+      email: "david@primewave.com",
+      name: "David Silva",
+      passwordHash: userPasswordHash,
+      role: Role.USER,
+      department: "Hardware",
       avatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
     },
-    {
-      email: "dilani@primewave.com",
-      name: "Dilani Silva",
-      passwordHash: defaultPasswordHash,
-      role: Role.USER,
-      department: "Client Solutions",
-      avatarUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80",
-    },
-  ];
+  });
 
-  const createdUsers: Record<string, string> = {};
-  for (const u of usersData) {
-    const user = await prisma.user.upsert({
-      where: { email: u.email },
-      update: {
-        name: u.name,
-        role: u.role,
-        department: u.department,
-        avatarUrl: u.avatarUrl,
-        passwordHash: u.passwordHash,
-      },
-      create: u,
-    });
-    createdUsers[u.email] = user.id;
-  }
-  console.log(`✅ Seeded ${Object.keys(createdUsers).length} users.`);
+  console.log(`👤 Created ${5} users (1 Admin, 4 Team Members).`);
 
-  // 3. Upsert Categories
-  const categoriesData = [
-    {
-      slug: "meeting-rooms",
+  // 2. Create Categories
+  const catRooms = await prisma.category.create({
+    data: {
       name: "Meeting Rooms",
-      description: "Collaborative meeting spaces, executive boardrooms, and focus pods.",
+      slug: "meeting-rooms",
+      description: "Acoustically treated conference and focus rooms with collaboration screens and A/V equipment",
     },
-    {
-      slug: "av-equipment",
-      name: "Audio & Visual Gear",
-      description: "Professional cameras, wireless mics, portable projectors, and lighting rigs.",
-    },
-    {
-      slug: "labs-desks",
-      name: "Engineering Labs & Tech Desks",
-      description: "Dedicated hardware testing benches, VR labs, and specialized test rigs.",
-    },
-    {
-      slug: "vehicles-transport",
-      name: "Vehicles & Transport",
-      description: "Company cars and logistics vans for site visits and client transit.",
-    },
-  ];
+  });
 
-  const createdCategories: Record<string, string> = {};
-  for (const c of categoriesData) {
-    const category = await prisma.category.upsert({
-      where: { slug: c.slug },
-      update: {
-        name: c.name,
-        description: c.description,
-      },
-      create: c,
-    });
-    createdCategories[c.slug] = category.id;
-  }
-  console.log(`✅ Seeded ${Object.keys(createdCategories).length} categories.`);
+  const catAV = await prisma.category.create({
+    data: {
+      name: "A/V & Media Gear",
+      slug: "av-gear",
+      description: "High-end cameras, wireless audio, studio lighting, and video podcasting equipment",
+    },
+  });
 
-  // 4. Upsert Resources
-  const resourcesData = [
-    {
-      name: "Main Boardroom (Alpha)",
-      description: "Spacious executive boardroom with 4K video conferencing and dual presentation displays.",
-      categorySlug: "meeting-rooms",
-      location: "Floor 4, North Wing",
-      capacity: 20,
+  const catLab = await prisma.category.create({
+    data: {
+      name: "Lab Benches & Hardware",
+      slug: "lab-benches",
+      description: "Electronics testing stations, oscilloscopes, soldering tools, and 3D printing equipment",
+    },
+  });
+
+  const catVehicles = await prisma.category.create({
+    data: {
+      name: "Company Fleet",
+      slug: "company-fleet",
+      description: "Shared company vehicles for client visits, team transport, and equipment transport",
+    },
+  });
+
+  console.log(`📂 Created 4 resource categories.`);
+
+  // 3. Create Resources
+  const roomAlpha = await prisma.resource.create({
+    data: {
+      name: "Conference Room Alpha",
+      description: "Flagship boardroom equipped for hybrid team meetings and client presentations.",
+      categoryId: catRooms.id,
+      location: "Floor 2, West Wing",
+      capacity: 14,
       status: ResourceStatus.ACTIVE,
       attributes: {
-        display: "85-inch 4K HDR",
-        videoConf: "Poly Studio X50",
+        screen: "75-inch 4K Display",
+        videoSystem: "Logitech Rally Bar",
         whiteboard: true,
-        coffeeStation: true,
+        airConditioning: true,
+        bufferMinutes: 15,
       },
     },
-    {
-      name: "Brainstorming Pod B",
-      description: "Interactive team brainstorming room equipped with digital whiteboard and lounge seating.",
-      categorySlug: "meeting-rooms",
-      location: "Floor 2, Central Hub",
-      capacity: 6,
+  });
+
+  const roomBeta = await prisma.resource.create({
+    data: {
+      name: "Focus Pod Beta",
+      description: "Quiet sound-insulated room ideal for 1-on-1s, interviews, and deep focus sessions.",
+      categoryId: catRooms.id,
+      location: "Floor 2, Quiet Zone",
+      capacity: 4,
       status: ResourceStatus.ACTIVE,
       attributes: {
-        display: "55-inch Touchscreen",
+        screen: "43-inch Monitor",
         whiteboard: true,
-        standingTable: true,
+        acousticRating: "Soundproofed (Class A)",
       },
     },
-    {
-      name: "Focus Room 1",
-      description: "Soundproof single/duo booth designed for focused work, 1-on-1s, or private video calls.",
-      categorySlug: "meeting-rooms",
-      location: "Floor 2, East Corridor",
-      capacity: 2,
+  });
+
+  const roomExecutive = await prisma.resource.create({
+    data: {
+      name: "Executive Ocean Boardroom",
+      description: "Premium conference room for board meetings, partner summits, and all-hands streams.",
+      categoryId: catRooms.id,
+      location: "Floor 3, Executive Suite",
+      capacity: 22,
       status: ResourceStatus.ACTIVE,
       attributes: {
-        soundproof: true,
-        dualMonitors: true,
-        ringLight: true,
+        screen: "Dual 85-inch 4K Displays",
+        videoSystem: "Poly Studio E70 + Ceiling Mic Array",
+        refreshmentsCounter: true,
+        bufferMinutes: 15,
       },
     },
-    {
+  });
+
+  const roomRenovating = await prisma.resource.create({
+    data: {
+      name: "Conference Room Gamma",
+      description: "Currently decommissioned for acoustic baffling upgrades and audio reconfiguration.",
+      categoryId: catRooms.id,
+      location: "Floor 1, East Hall",
+      capacity: 8,
+      status: ResourceStatus.INACTIVE,
+      attributes: {
+        notice: "Deactivated for Q4 Facility Redesign",
+      },
+    },
+  });
+
+  const sonyCamera = await prisma.resource.create({
+    data: {
       name: "Sony FX3 Cinema Camera Kit",
-      description: "Full-frame 4K camera rig with 24-70mm f/2.8 lens, 2x batteries, and carbon tripod.",
-      categorySlug: "av-equipment",
-      location: "A/V Storage Locker 102",
+      description: "Full-frame cinema line camera with 24-70mm f/2.8 GM II lens, shotgun mic, and audio handle.",
+      categoryId: catAV.id,
+      location: "Media Locker A-04",
       capacity: null,
       status: ResourceStatus.ACTIVE,
       attributes: {
-        serial: "SN-FX3-88210",
-        accessories: ["24-70mm Lens", "Dual SD Cards (128GB)", "Carbon Tripod", "Cage"],
+        sensor: "Full-frame 4K 120p",
+        batteries: 4,
+        cards: "2x 160GB CFexpress Type A",
+        tripod: "Manfrotto 504X Video Head",
       },
     },
-    {
-      name: "DJI Mic 2 Dual Wireless Audio",
-      description: "2-person wireless transmitter set with 32-bit float internal recording and charging case.",
-      categorySlug: "av-equipment",
-      location: "A/V Storage Locker 104",
-      capacity: null,
-      status: ResourceStatus.ACTIVE,
-      attributes: {
-        serial: "SN-DJI-4419",
-        channels: 2,
-        batteryHours: 18,
-      },
-    },
-    {
-      name: "Epson 4K Laser Projector",
-      description: "Portable 5,000 lumens high-brightness laser projector for all-hands demos and presentations.",
-      categorySlug: "av-equipment",
-      location: "Cabinet B, Presentation Storeroom",
-      capacity: null,
-      status: ResourceStatus.ACTIVE,
-      attributes: {
-        lumens: 5000,
-        connectivity: ["HDMI", "USB-C", "AirPlay"],
-      },
-    },
-    {
-      name: "Hardware Prototyping Bench #3",
-      description: "Lab bench with digital oscilloscope, Weller soldering station, and benchtop DC power supply.",
-      categorySlug: "labs-desks",
-      location: "Hardware Engineering Lab, Rm 105",
+  });
+
+  const podcastKit = await prisma.resource.create({
+    data: {
+      name: "Studio Podcast Broadcast Station",
+      description: "Dual microphone broadcast setup for webinar recordings and executive podcasting.",
+      categoryId: catAV.id,
+      location: "Studio Room 102",
       capacity: 2,
       status: ResourceStatus.ACTIVE,
       attributes: {
-        equipment: ["Rigol 100MHz Oscilloscope", "Dual DC Power Supply", "Soldering Station"],
-        safetyGogglesProvided: true,
+        microphones: "2x Shure SM7B + Cloudlifters",
+        mixer: "RODECaster Pro II",
+        headphones: "2x Audio-Technica ATH-M50x",
       },
     },
-    {
-      name: "VR Testing Station (Meta Quest 3)",
-      description: "Clearance area with high-spec VR workstation and Meta Quest 3 developer kit.",
-      categorySlug: "labs-desks",
-      location: "R&D Lab, Room 208",
-      capacity: 1,
-      status: ResourceStatus.MAINTENANCE,
+  });
+
+  const oscBench = await prisma.resource.create({
+    data: {
+      name: "RF & Oscilloscope Workbench #1",
+      description: "High-precision testing workstation for hardware prototyping and firmware debugging.",
+      categoryId: catLab.id,
+      location: "Hardware Lab 1, Bench 3",
+      capacity: 2,
+      status: ResourceStatus.ACTIVE,
       attributes: {
-        gpu: "RTX 4080",
-        headset: "Meta Quest 3 512GB",
-        note: "Headset strap under maintenance until tomorrow morning",
+        oscilloscope: "Keysight InfiniVision 500MHz 4-Ch",
+        powerSupply: "Rigol DP832 Triple-Output",
+        multimeter: "Fluke 87V",
+        soldering: "Hakko FX-888D ESD Station",
       },
     },
-    {
-      name: "Toyota Prius (Company Hybrid - WP CAB-4512)",
-      description: "Fuel-efficient company hybrid car for client visits and local business errands.",
-      categorySlug: "vehicles-transport",
-      location: "Basement Parking Bay B-04",
+  });
+
+  const printer3D = await prisma.resource.create({
+    data: {
+      name: "Formlabs Form 3+ SLA 3D Printer",
+      description: "Industrial precision stereolithography 3D printer for mechanical housing prototypes.",
+      categoryId: catLab.id,
+      location: "Prototyping Workshop",
+      capacity: 1,
+      status: ResourceStatus.ACTIVE,
+      attributes: {
+        buildVolume: "14.5 x 14.5 x 18.5 cm",
+        resin: "Draft Resin & Tough 2000",
+        curingUnit: "Form Cure & Wash Included",
+      },
+    },
+  });
+
+  const tesla = await prisma.resource.create({
+    data: {
+      name: "Tesla Model Y (Fleet #1)",
+      description: "All-electric compact SUV available for official client meetings and business travel.",
+      categoryId: catVehicles.id,
+      location: "Basement Parking B-12",
       capacity: 5,
       status: ResourceStatus.ACTIVE,
       attributes: {
-        licensePlate: "WP CAB-4512",
-        transmission: "Automatic",
-        fuelType: "Petrol Hybrid",
-        mileagePolicy: "Full-to-full fuel policy",
+        range: "450 km WLTP",
+        powertrain: "Dual Motor AWD",
+        chargingPass: "Included in glovebox",
+        bufferMinutes: 30,
       },
     },
-    {
-      name: "Nissan NV200 Cargo Van (WP CAS-8821)",
-      description: "High-capacity logistics van for equipment transfer and event production transport.",
-      categorySlug: "vehicles-transport",
-      location: "Loading Dock 2",
-      capacity: 2,
-      status: ResourceStatus.ACTIVE,
+  });
+
+  const van = await prisma.resource.create({
+    data: {
+      name: "Toyota HiAce Transport Van",
+      description: "High-roof utility van for transporting hardware and event booths. Currently scheduled for service.",
+      categoryId: catVehicles.id,
+      location: "Basement Parking B-15",
+      capacity: 10,
+      status: ResourceStatus.MAINTENANCE,
       attributes: {
-        licensePlate: "WP CAS-8821",
-        payloadKg: 750,
-        cargoVolumeM3: 4.2,
+        scheduledMaintenance: "Brake service and inspection",
+        availableDate: "Next Monday",
       },
     },
-  ];
+  });
 
-  const createdResources: Record<string, string> = {};
-  for (const r of resourcesData) {
-    const categoryId = createdCategories[r.categorySlug];
-    const existing = await prisma.resource.findFirst({
-      where: { name: r.name },
-    });
+  console.log(`🏢 Created 10 realistic resources across 4 categories.`);
 
-    if (existing) {
-      const updated = await prisma.resource.update({
-        where: { id: existing.id },
-        data: {
-          description: r.description,
-          location: r.location,
-          capacity: r.capacity,
-          status: r.status,
-          attributes: r.attributes,
-          categoryId,
-        },
-      });
-      createdResources[r.name] = updated.id;
-    } else {
-      const created = await prisma.resource.create({
-        data: {
-          name: r.name,
-          description: r.description,
-          location: r.location,
-          capacity: r.capacity,
-          status: r.status,
-          attributes: r.attributes,
-          categoryId,
-        },
-      });
-      createdResources[r.name] = created.id;
-    }
-  }
-  console.log(`✅ Seeded ${Object.keys(createdResources).length} resources.`);
+  // 4. Create Pre-populated Reservations anchored to Today and Tomorrow
+  const now = new Date();
+  
+  // Helper to construct Date objects at specific hours for Today
+  const getTodayTime = (hours: number, minutes = 0) => {
+    const d = new Date(now);
+    d.setHours(hours, minutes, 0, 0);
+    return d;
+  };
 
-  // 5. Seed Reservations (dynamic timestamps around today and tomorrow)
-  const today = startOfDay(new Date());
-  const tomorrow = addDays(today, 1);
+  // Helper for Tomorrow
+  const getTomorrowTime = (hours: number, minutes = 0) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() + 1);
+    d.setHours(hours, minutes, 0, 0);
+    return d;
+  };
 
-  const sampleReservations = [
-    // Today: Boardroom
-    {
-      title: "Executive Sprint Planning",
-      notes: "Bi-weekly sprint planning meeting with full tech leads and design team.",
-      resourceName: "Main Boardroom (Alpha)",
-      userEmail: "sarah@primewave.com",
-      startTime: setMinutes(setHours(today, 9), 0),   // 09:00 AM
-      endTime: setMinutes(setHours(today, 11), 0),    // 11:00 AM
-      status: ReservationStatus.CONFIRMED,
-    },
-    {
-      title: "Client Architecture Review",
-      notes: "Architecture presentation with overseas client stakeholders.",
-      resourceName: "Main Boardroom (Alpha)",
-      userEmail: "alex@primewave.com",
-      startTime: setMinutes(setHours(today, 14), 0),  // 02:00 PM
-      endTime: setMinutes(setHours(today, 15), 30),  // 03:30 PM
-      status: ReservationStatus.CONFIRMED,
-    },
-    // Today: Brainstorming Pod B
-    {
-      title: "UX Flow Ideation",
-      notes: "Sketching mobile wireframes on the interactive whiteboard.",
-      resourceName: "Brainstorming Pod B",
-      userEmail: "priyantha@primewave.com",
-      startTime: setMinutes(setHours(today, 10), 30), // 10:30 AM
-      endTime: setMinutes(setHours(today, 12), 0),   // 12:00 PM
-      status: ReservationStatus.CONFIRMED,
-    },
-    // Today: Camera kit
-    {
-      title: "Product Video Shoot - Case Study",
-      notes: "Filming customer testimonial video in conference room 3.",
-      resourceName: "Sony FX3 Cinema Camera Kit",
-      userEmail: "dilani@primewave.com",
-      startTime: setMinutes(setHours(today, 13), 0),  // 01:00 PM
-      endTime: setMinutes(setHours(today, 17), 0),  // 05:00 PM
-      status: ReservationStatus.CONFIRMED,
-    },
-    // Tomorrow: Prius
-    {
-      title: "Client Site Visit - Colombo 03",
-      notes: "Onsite technical deployment check at client premises.",
-      resourceName: "Toyota Prius (Company Hybrid - WP CAB-4512)",
-      userEmail: "sarah@primewave.com",
-      startTime: setMinutes(setHours(tomorrow, 9), 30), // Tomorrow 09:30 AM
-      endTime: setMinutes(setHours(tomorrow, 13), 30), // Tomorrow 01:30 PM
-      status: ReservationStatus.CONFIRMED,
-    },
-  ];
+  await prisma.reservation.createMany({
+    data: [
+      {
+        title: "Sprint Planning & Backlog Grooming",
+        notes: "Engineering team bi-weekly sprint planning session.",
+        startTime: getTodayTime(9, 30),
+        endTime: getTodayTime(11, 0),
+        status: ReservationStatus.CONFIRMED,
+        resourceId: roomAlpha.id,
+        userId: sarah.id,
+      },
+      {
+        title: "Client Architecture Review with Enterprise Stakeholders",
+        notes: "Presenting the new cloud migration roadmap and SLA guarantees.",
+        startTime: getTodayTime(13, 30),
+        endTime: getTodayTime(15, 0),
+        status: ReservationStatus.CONFIRMED,
+        resourceId: roomAlpha.id,
+        userId: alex.id,
+      },
+      {
+        title: "Executive Strategic Operations Review",
+        notes: "Quarterly budget allocations and staffing review.",
+        startTime: getTodayTime(10, 0),
+        endTime: getTodayTime(12, 0),
+        status: ReservationStatus.CONFIRMED,
+        resourceId: roomExecutive.id,
+        userId: admin.id,
+      },
+      {
+        title: "Product Launch Promotional Video Shoot",
+        notes: "Recording testimonial interviews and product B-roll footage.",
+        startTime: getTodayTime(10, 30),
+        endTime: getTodayTime(14, 0),
+        status: ReservationStatus.CONFIRMED,
+        resourceId: sonyCamera.id,
+        userId: emily.id,
+      },
+      {
+        title: "ESP32 Firmware Power Consumption Analysis",
+        notes: "Validating sleep cycle power draw on battery-operated sensors.",
+        startTime: getTodayTime(14, 0),
+        endTime: getTodayTime(17, 30),
+        status: ReservationStatus.CONFIRMED,
+        resourceId: oscBench.id,
+        userId: david.id,
+      },
+      {
+        title: "Design System Figma Sync & Component Review",
+        notes: "Aligning frontend components with new Figma token standards.",
+        startTime: getTomorrowTime(10, 0),
+        endTime: getTomorrowTime(11, 30),
+        status: ReservationStatus.CONFIRMED,
+        resourceId: roomBeta.id,
+        userId: emily.id,
+      },
+      {
+        title: "On-site Client Infrastructure Audit",
+        notes: "Transporting hardware diagnostic tools to Colombo datacenter.",
+        startTime: getTomorrowTime(13, 0),
+        endTime: getTomorrowTime(17, 0),
+        status: ReservationStatus.CONFIRMED,
+        resourceId: tesla.id,
+        userId: alex.id,
+      },
+    ],
+  });
 
-  // Clean old reservations before inserting to avoid duplicate conflicts on re-seeding
-  await prisma.reservation.deleteMany({});
-
-  for (const res of sampleReservations) {
-    const resourceId = createdResources[res.resourceName];
-    const userId = createdUsers[res.userEmail];
-
-    if (resourceId && userId) {
-      await prisma.reservation.create({
-        data: {
-          title: res.title,
-          notes: res.notes,
-          resourceId,
-          userId,
-          startTime: res.startTime,
-          endTime: res.endTime,
-          status: res.status,
-        },
-      });
-    }
-  }
-  console.log(`✅ Seeded ${sampleReservations.length} realistic reservations.`);
-  console.log("🚀 PrimeWave database seed completed successfully!");
+  console.log(`📅 Created 7 pre-populated reservations for today and tomorrow.`);
+  console.log("✨ Seed completed successfully!");
 }
 
 main()
   .catch((e) => {
-    console.error("❌ Seed failed:", e);
+    console.error("❌ Error during database seed:", e);
     process.exit(1);
   })
   .finally(async () => {

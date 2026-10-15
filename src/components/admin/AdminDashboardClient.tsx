@@ -55,6 +55,8 @@ export function AdminDashboardClient({
   const [formDescription, setFormDescription] = React.useState("");
   const [formStatus, setFormStatus] = React.useState<ResourceStatus>(ResourceStatus.ACTIVE);
   const [formAttributes, setFormAttributes] = React.useState("");
+  const [requireBuffer, setRequireBuffer] = React.useState(false);
+  const [bufferMinutes, setBufferMinutes] = React.useState(15);
 
   const [isSaving, setIsSaving] = React.useState(false);
   const [formError, setFormError] = React.useState("");
@@ -67,6 +69,8 @@ export function AdminDashboardClient({
     setFormCapacity("");
     setFormDescription("");
     setFormStatus(ResourceStatus.ACTIVE);
+    setRequireBuffer(false);
+    setBufferMinutes(15);
     setFormAttributes(JSON.stringify({ screen: "4K TV", whiteboard: true }, null, 2));
     setFormError("");
     setIsModalOpen(true);
@@ -80,6 +84,9 @@ export function AdminDashboardClient({
     setFormCapacity(res.capacity ? String(res.capacity) : "");
     setFormDescription(res.description || "");
     setFormStatus(res.status);
+    const attrs = res.attributes || {};
+    setRequireBuffer(Boolean(attrs.bufferMinutes && Number(attrs.bufferMinutes) > 0));
+    setBufferMinutes(attrs.bufferMinutes ? Number(attrs.bufferMinutes) : 15);
     setFormAttributes(
       res.attributes ? JSON.stringify(res.attributes, null, 2) : "{}"
     );
@@ -101,6 +108,12 @@ export function AdminDashboardClient({
         setIsSaving(false);
         return;
       }
+    }
+
+    if (requireBuffer) {
+      (parsedAttrs as any).bufferMinutes = Number(bufferMinutes) || 15;
+    } else {
+      delete (parsedAttrs as any).bufferMinutes;
     }
 
     try {
@@ -226,6 +239,11 @@ export function AdminDashboardClient({
                     {res.status === ResourceStatus.INACTIVE && (
                       <Badge variant="danger" className="text-[10px]">
                         <Ban className="w-3 h-3 mr-1" /> Inactive
+                      </Badge>
+                    )}
+                    {Number((res.attributes as any)?.bufferMinutes) > 0 && (
+                      <Badge variant="teal" className="text-[10px] gap-1">
+                        <span>🧹</span> {(res.attributes as any).bufferMinutes}m Turnaround Buffer
                       </Badge>
                     )}
                   </div>
@@ -398,6 +416,52 @@ export function AdminDashboardClient({
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
               />
+            </div>
+
+            {/* Turnaround Buffer Setting */}
+            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3.5 space-y-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <span className="text-lg">🧹</span>
+                  <div>
+                    <label
+                      htmlFor="turnaround-toggle"
+                      className="text-xs font-semibold text-slate-200 block cursor-pointer"
+                    >
+                      Require Turnaround Buffer (Cleaning & Reset)
+                    </label>
+                    <span className="text-[11px] text-slate-400 block leading-relaxed">
+                      Enforce automated interval buffer between consecutive bookings for cleaning, inspection, or recharge.
+                    </span>
+                  </div>
+                </div>
+                <input
+                  id="turnaround-toggle"
+                  type="checkbox"
+                  checked={requireBuffer}
+                  onChange={(e) => setRequireBuffer(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-teal-600 focus:ring-teal-500 cursor-pointer mt-0.5"
+                />
+              </div>
+
+              {requireBuffer && (
+                <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-3">
+                  <span className="text-xs text-slate-300 font-medium">
+                    Buffer Duration:
+                  </span>
+                  <select
+                    value={bufferMinutes}
+                    onChange={(e) => setBufferMinutes(Number(e.target.value))}
+                    className="bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  >
+                    <option value={10}>10 minutes (Quick Wipe & Air)</option>
+                    <option value={15}>15 minutes (Standard Room Reset / Sanitization)</option>
+                    <option value={30}>30 minutes (Deep Sanitization / Vehicle Check)</option>
+                    <option value={45}>45 minutes (A/V Gear Re-configuration)</option>
+                    <option value={60}>60 minutes (Heavy Cleaning / EV Fleet Recharge)</option>
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">

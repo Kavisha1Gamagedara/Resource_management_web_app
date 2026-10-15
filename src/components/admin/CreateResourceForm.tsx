@@ -23,6 +23,8 @@ export function CreateResourceForm({ categories }: CreateResourceFormProps) {
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<ResourceStatus>(ResourceStatus.ACTIVE);
   const [attributes, setAttributes] = useState("");
+  const [requireBuffer, setRequireBuffer] = useState(false);
+  const [bufferMinutes, setBufferMinutes] = useState(15);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export function CreateResourceForm({ categories }: CreateResourceFormProps) {
     e.preventDefault();
     setError(null);
 
-    let parsedAttributes = {};
+    let parsedAttributes: any = {};
     if (attributes.trim()) {
       try {
         parsedAttributes = JSON.parse(attributes);
@@ -39,6 +41,10 @@ export function CreateResourceForm({ categories }: CreateResourceFormProps) {
         setError("Invalid JSON format in custom attributes.");
         return;
       }
+    }
+
+    if (requireBuffer) {
+      parsedAttributes.bufferMinutes = Number(bufferMinutes) || 15;
     }
 
     setIsSubmitting(true);
@@ -173,12 +179,58 @@ export function CreateResourceForm({ categories }: CreateResourceFormProps) {
           </label>
           <input
             type="text"
-            placeholder='{"hasProjector": true, "whiteboard": true}'
+            placeholder='{"screen": "4K TV", "whiteboard": true}'
             value={attributes}
             onChange={(e) => setAttributes(e.target.value)}
             className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-purple-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
           />
         </div>
+      </div>
+
+      {/* Turnaround Buffer Setting */}
+      <div className="rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4 space-y-3 dark:border-zinc-800 dark:bg-zinc-800/50">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <span className="text-lg">🧹</span>
+            <div>
+              <label
+                htmlFor="crf-turnaround-toggle"
+                className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 block cursor-pointer"
+              >
+                Require Turnaround Buffer (Cleaning & Reset)
+              </label>
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block leading-relaxed">
+                Enforce mandatory gap between consecutive bookings for cleaning, room reset, or recharge.
+              </span>
+            </div>
+          </div>
+          <input
+            id="crf-turnaround-toggle"
+            type="checkbox"
+            checked={requireBuffer}
+            onChange={(e) => setRequireBuffer(e.target.checked)}
+            className="h-4 w-4 rounded border-zinc-300 text-purple-600 focus:ring-purple-500 cursor-pointer mt-0.5"
+          />
+        </div>
+
+        {requireBuffer && (
+          <div className="pt-2 border-t border-zinc-200/80 dark:border-zinc-700/80 flex items-center justify-between gap-3">
+            <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium">
+              Turnaround Duration:
+            </span>
+            <select
+              value={bufferMinutes}
+              onChange={(e) => setBufferMinutes(Number(e.target.value))}
+              className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs text-zinc-900 outline-none focus:border-purple-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            >
+              <option value={10}>10 minutes (Quick Wipe & Air)</option>
+              <option value={15}>15 minutes (Standard Room Reset / Sanitization)</option>
+              <option value={30}>30 minutes (Deep Sanitization / Vehicle Check)</option>
+              <option value={45}>45 minutes (A/V Gear Re-configuration)</option>
+              <option value={60}>60 minutes (Heavy Cleaning / EV Fleet Recharge)</option>
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-3">

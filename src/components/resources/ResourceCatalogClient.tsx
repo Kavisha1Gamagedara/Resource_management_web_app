@@ -1,219 +1,358 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { Search, Filter, SlidersHorizontal, Building2, Tag, X } from "lucide-react";
-import { ResourceCard } from "@/components/resources/ResourceCard";
-import { ResourceStatus } from "@/types";
+import * as React from "react";
+import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { BookingModal } from "@/components/reservations/BookingModal";
+import {
+  Search,
+  MapPin,
+  Users,
+  Calendar,
+  Clock,
+  Sparkles,
+  CheckCircle,
+  Wrench,
+  Ban,
+  ArrowRight,
+  Filter,
+} from "lucide-react";
+import { formatTime } from "@/lib/utils";
+import { ResourceStatus } from "@prisma/client";
 
 interface Category {
   id: string;
   name: string;
   slug: string;
-  _count?: { resources: number };
 }
 
 interface ResourceItem {
   id: string;
   name: string;
-  description?: string | null;
+  description: string | null;
   location: string;
-  capacity?: number | null;
+  capacity: number | null;
   status: ResourceStatus;
-  category?: {
+  attributes: any;
+  categoryId: string;
+  category: {
     id: string;
     name: string;
-    slug: string;
-  } | null;
-  attributes?: any;
-  _count?: {
-    reservations: number;
   };
+  reservations: {
+    id: string;
+    title: string;
+    startTime: string | Date;
+    endTime: string | Date;
+  }[];
 }
 
 interface ResourceCatalogClientProps {
-  resources: ResourceItem[];
+  initialResources: ResourceItem[];
   categories: Category[];
 }
 
 export function ResourceCatalogClient({
-  resources,
+  initialResources,
   categories,
 }: ResourceCatalogClientProps) {
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
-  const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
-  const [capacityFilter, setCapacityFilter] = useState<string>("ALL");
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
-  const filteredResources = useMemo(() => {
-    return resources.filter((r) => {
-      // 1. Search Query
-      const query = search.toLowerCase();
-      const matchesSearch =
-        r.name.toLowerCase().includes(query) ||
-        r.location.toLowerCase().includes(query) ||
-        (r.description && r.description.toLowerCase().includes(query)) ||
-        (r.category && r.category.name.toLowerCase().includes(query));
+  const selectedCategory = searchParams.get("category") || "ALL";
+  const [statusFilter, setStatusFilter] = React.useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = React.useState("");
 
-      if (!matchesSearch) return false;
+  // Booking Modal State
+  const [bookingTarget, setBookingTarget] = React.useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
-      // 2. Category Filter
-      if (selectedCategory !== "ALL" && r.category?.slug !== selectedCategory) {
+  // Filtered resources
+  const filteredResources = React.useMemo(() => {
+    return initialResources.filter((res) => {
+      // Category filter
+      if (selectedCategory !== "ALL" && res.categoryId !== selectedCategory) {
         return false;
       }
 
-      // 3. Status Filter
-      if (selectedStatus !== "ALL" && r.status !== selectedStatus) {
+      // Status filter
+      if (statusFilter !== "ALL" && res.status !== statusFilter) {
         return false;
       }
 
-      // 4. Capacity Filter
-      if (capacityFilter !== "ALL") {
-        if (!r.capacity) return false;
-        if (capacityFilter === "SMALL" && (r.capacity < 1 || r.capacity > 4)) return false;
-        if (capacityFilter === "MEDIUM" && (r.capacity < 5 || r.capacity > 10)) return false;
-        if (capacityFilter === "LARGE" && r.capacity <= 10) return false;
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesName = res.name.toLowerCase().includes(q);
+        const matchesLocation = res.location.toLowerCase().includes(q);
+        const matchesDesc = res.description?.toLowerCase().includes(q) || false;
+        const matchesAttrs = res.attributes
+          ? JSON.stringify(res.attributes).toLowerCase().includes(q)
+          : false;
+
+        if (!matchesName && !matchesLocation && !matchesDesc && !matchesAttrs) {
+          return false;
+        }
       }
 
       return true;
     });
-  }, [resources, search, selectedCategory, selectedStatus, capacityFilter]);
+  }, [initialResources, selectedCategory, statusFilter, searchQuery]);
 
-  const hasActiveFilters =
-    search !== "" ||
-    selectedCategory !== "ALL" ||
-    selectedStatus !== "ALL" ||
-    capacityFilter !== "ALL";
+  const handleCategoryChange = (catId: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (catId === "ALL") {
+      params.delete("category");
+    } else {
+      params.set("category", catId);
+    }
+    router.push(`/resources?${params.toString()}`);
+  };
 
-  const clearFilters = () => {
-    setSearch("");
-    setSelectedCategory("ALL");
-    setSelectedStatus("ALL");
-    setCapacityFilter("ALL");
+  const getStatusBadge = (status: ResourceStatus) => {
+    switch (status) {
+      case "ACTIVE":
+        return (
+          <Badge variant="success" className="gap-1">
+            <CheckCircle className="w-3 h-3" /> Active
+          </Badge>
+        );
+      case "MAINTENANCE":
+        return (
+          <Badge variant="warning" className="gap-1">
+            <Wrench className="w-3 h-3" /> Maintenance
+          </Badge>
+        );
+      case "INACTIVE":
+        return (
+          <Badge variant="danger" className="gap-1">
+            <Ban className="w-3 h-3" /> Inactive
+          </Badge>
+        );
+      default:
+        return <Badge variant="neutral">{status}</Badge>;
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Category Pills Header */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        <button
-          onClick={() => setSelectedCategory("ALL")}
-          className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold whitespace-nowrap transition-all ${
-            selectedCategory === "ALL"
-              ? "bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
-              : "bg-white text-zinc-600 hover:bg-zinc-100 border border-zinc-200/80 dark:bg-zinc-900/60 dark:text-zinc-400 dark:border-zinc-800"
-          }`}
-        >
-          <span>All Facilities & Gear</span>
-          <span className="rounded-full bg-zinc-200/60 px-1.5 py-0.2 text-[10px] dark:bg-zinc-800">
-            {resources.length}
-          </span>
-        </button>
+      {/* Page Title & Search Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            Resource Catalog
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Browse and reserve meeting rooms, A/V gear, hardware labs, and vehicles
+          </p>
+        </div>
 
-        {categories.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setSelectedCategory(c.slug)}
-            className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold whitespace-nowrap transition-all ${
-              selectedCategory === c.slug
-                ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
-                : "bg-white text-zinc-600 hover:bg-zinc-100 border border-zinc-200/80 dark:bg-zinc-900/60 dark:text-zinc-400 dark:border-zinc-800"
-            }`}
-          >
-            <span>{c.name}</span>
-            {c._count?.resources !== undefined && (
-              <span className="rounded-full bg-zinc-100 px-1.5 py-0.2 text-[10px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                {c._count.resources}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 dark:bg-zinc-900/60 shadow-sm">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-zinc-400" />
-          <input
-            type="text"
-            placeholder="Search resources by name, location, or amenities..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2 pl-10 pr-4 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
+        {/* Search Input */}
+        <div className="relative w-full md:w-80">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Input
+            placeholder="Search by name, location, specs..."
+            className="pl-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+      </div>
 
-        {/* Dropdowns */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Status filter */}
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="rounded-xl border border-zinc-200 bg-zinc-50/50 py-2 px-3 text-xs text-zinc-900 focus:border-teal-500 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
+      {/* Filter Tabs: Categories and Status */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+        {/* Category Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+          <button
+            onClick={() => handleCategoryChange("ALL")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+              selectedCategory === "ALL"
+                ? "bg-emerald-600 text-white shadow-md shadow-emerald-950/40"
+                : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white"
+            }`}
           >
-            <option value="ALL">Any Status</option>
-            <option value="ACTIVE">Available (Active)</option>
-            <option value="MAINTENANCE">In Maintenance</option>
-            <option value="INACTIVE">Deactivated</option>
-          </select>
-
-          {/* Capacity filter */}
-          <select
-            value={capacityFilter}
-            onChange={(e) => setCapacityFilter(e.target.value)}
-            className="rounded-xl border border-zinc-200 bg-zinc-50/50 py-2 px-3 text-xs text-zinc-900 focus:border-teal-500 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
-          >
-            <option value="ALL">Any Capacity</option>
-            <option value="SMALL">Small (1–4 people)</option>
-            <option value="MEDIUM">Medium (5–10 people)</option>
-            <option value="LARGE">Large (10+ people)</option>
-          </select>
-
-          {hasActiveFilters && (
+            All Resources ({initialResources.length})
+          </button>
+          {categories.map((cat) => (
             <button
-              onClick={clearFilters}
-              className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-300 transition-colors"
+              key={cat.id}
+              onClick={() => handleCategoryChange(cat.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                selectedCategory === cat.id
+                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-950/40"
+                  : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white"
+              }`}
             >
-              <X className="h-3.5 w-3.5" />
-              <span>Reset</span>
+              {cat.name}
             </button>
-          )}
+          ))}
+        </div>
+
+        {/* Status Dropdown Filter */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Filter className="w-3.5 h-3.5 text-slate-400" />
+          <span className="text-xs text-slate-400">Status:</span>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="ACTIVE">Active Only</option>
+            <option value="MAINTENANCE">Maintenance</option>
+            <option value="INACTIVE">Inactive</option>
+          </select>
         </div>
       </div>
 
-      {/* Results Header */}
-      <div className="flex items-center justify-between text-xs text-zinc-500">
-        <span>
-          Showing <strong>{filteredResources.length}</strong> of{" "}
-          <strong>{resources.length}</strong> resources
-        </span>
-      </div>
-
-      {/* Grid of Resources */}
+      {/* Resource Grid */}
       {filteredResources.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-zinc-300 p-12 text-center dark:border-zinc-800">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-500 dark:bg-zinc-900">
-            <Building2 className="h-6 w-6" />
-          </div>
-          <h3 className="mt-4 text-base font-semibold text-zinc-900 dark:text-zinc-100">
-            No resources match your filters
-          </h3>
-          <p className="mt-1 text-xs text-zinc-500">
-            Try adjusting your search terms, category selection, or capacity criteria.
+        <div className="text-center py-16 border border-dashed border-slate-800 rounded-2xl space-y-3">
+          <Search className="w-10 h-10 text-slate-600 mx-auto" />
+          <h3 className="text-base font-semibold text-white">No resources matched your filters</h3>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            Try resetting your search query or switching to another category.
           </p>
-          <button
-            onClick={clearFilters}
-            className="mt-4 rounded-xl bg-zinc-900 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700 dark:bg-zinc-100 dark:text-zinc-900 transition-colors"
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSearchQuery("");
+              setStatusFilter("ALL");
+              handleCategoryChange("ALL");
+            }}
           >
-            Clear All Filters
-          </button>
+            Reset Filters
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredResources.map((resource) => (
-            <ResourceCard key={resource.id} resource={resource} />
-          ))}
+          {filteredResources.map((res) => {
+            const isAvailable = res.status === "ACTIVE";
+            const nextBooking = res.reservations[0];
+
+            return (
+              <Card
+                key={res.id}
+                className="group border-slate-800/90 bg-slate-900/80 hover:border-slate-700 hover:bg-slate-900 flex flex-col justify-between transition-all duration-200"
+              >
+                <div className="p-5 space-y-3">
+                  {/* Category and Status Badge */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">
+                      {res.category.name}
+                    </span>
+                    {getStatusBadge(res.status)}
+                  </div>
+
+                  {/* Resource Name and Description */}
+                  <div>
+                    <Link href={`/resources/${res.id}`} className="group-hover:text-emerald-400 transition-colors">
+                      <h3 className="text-lg font-bold text-white leading-snug">
+                        {res.name}
+                      </h3>
+                    </Link>
+                    {res.description && (
+                      <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                        {res.description}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Meta: Location & Capacity */}
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 pt-1">
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      {res.location}
+                    </span>
+                    {res.capacity && (
+                      <span className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        Up to {res.capacity} people
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Dynamic Attributes / Specs Tags */}
+                  {res.attributes && typeof res.attributes === "object" && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {Number((res.attributes as any)?.bufferMinutes) > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-950/60 text-[11px] text-amber-300 border border-amber-800/60 font-medium">
+                          <span>🧹</span> {(res.attributes as any).bufferMinutes}m buffer
+                        </span>
+                      )}
+                      {Object.entries(res.attributes)
+                        .filter(([k]) => k !== "bufferMinutes")
+                        .slice(0, 3)
+                        .map(([k, v]) => (
+                          <span
+                            key={k}
+                            className="px-2 py-0.5 rounded bg-slate-800/80 text-[11px] text-slate-300 border border-slate-700/50"
+                          >
+                            {typeof v === "boolean" ? k : `${k}: ${String(v)}`}
+                          </span>
+                        ))}
+                    </div>
+                  )}
+
+                  {/* Next Booking Slot Preview */}
+                  <div className="pt-2 border-t border-slate-800/60">
+                    {nextBooking ? (
+                      <div className="flex items-center gap-2 text-xs text-amber-300/90 bg-amber-950/30 p-2 rounded-lg border border-amber-900/40">
+                        <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate">
+                          Next: {nextBooking.title} ({formatTime(nextBooking.startTime)} – {formatTime(nextBooking.endTime)})
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/20 p-2 rounded-lg border border-emerald-900/30">
+                        <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                        <span>No upcoming bookings · Available now</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card Actions */}
+                <div className="p-5 pt-0 border-t border-slate-800/60 mt-2 flex items-center justify-between gap-2">
+                  <Link href={`/resources/${res.id}`} className="w-1/2">
+                    <Button variant="outline" size="sm" className="w-full text-xs">
+                      <Calendar className="w-3.5 h-3.5 mr-1" /> Schedule
+                    </Button>
+                  </Link>
+
+                  <Button
+                    size="sm"
+                    className="w-1/2 text-xs"
+                    disabled={!isAvailable}
+                    onClick={() => setBookingTarget({ id: res.id, name: res.name })}
+                  >
+                    {isAvailable ? "Reserve" : "Unavailable"}
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
         </div>
+      )}
+
+      {/* Booking Modal */}
+      {bookingTarget && (
+        <BookingModal
+          isOpen={true}
+          onClose={() => setBookingTarget(null)}
+          resourceId={bookingTarget.id}
+          resourceName={bookingTarget.name}
+          onSuccess={() => {
+            router.refresh();
+          }}
+        />
       )}
     </div>
   );
