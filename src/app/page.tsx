@@ -3,6 +3,9 @@ import prisma from "@/lib/db";
 import { ResourceCard } from "@/components/resources/ResourceCard";
 import { Badge } from "@/components/ui/Badge";
 import { formatTimeRange } from "@/lib/utils";
+import { getCurrentUser } from "@/lib/auth";
+import { getOperationsAnalytics } from "@/lib/analytics";
+import { OperationsInsightsWidget } from "@/components/dashboard/OperationsInsightsWidget";
 import {
   Building2,
   CalendarCheck2,
@@ -16,6 +19,9 @@ import {
 } from "lucide-react";
 
 export default async function HomePage() {
+  const user = await getCurrentUser();
+  const isAdmin = user?.role === "ADMIN";
+
   // Query live summary statistics from database
   const [
     totalResources,
@@ -25,6 +31,7 @@ export default async function HomePage() {
     categories,
     recentResources,
     upcomingReservations,
+    operationsAnalytics,
   ] = await Promise.all([
     prisma.resource.count(),
     prisma.category.count(),
@@ -63,6 +70,7 @@ export default async function HomePage() {
         },
       },
     }),
+    isAdmin ? getOperationsAnalytics() : Promise.resolve(null),
   ]);
 
   return (
@@ -80,14 +88,14 @@ export default async function HomePage() {
           </h1>
 
           <p className="text-sm sm:text-base text-zinc-300 leading-relaxed max-w-2xl">
-            Streamline your organization’s shared facilities, A/V gear, engineering labs,
+            Streamline your organization&apos;s shared facilities, A/V gear, engineering labs,
             and company vehicles with guaranteed conflict prevention and clear visibility.
           </p>
 
           <div className="pt-2 flex flex-wrap items-center gap-3">
             <Link
               href="/resources"
-              className="inline-flex items-center gap-2 rounded-xl bg-teal-500 px-5 py-3 text-sm font-semibold text-zinc-950 shadow-md transition-all hover:bg-teal-400 hover:shadow-teal-500/25"
+              className="inline-flex items-center gap-2 rounded-xl bg-teal-500 px-5 py-3 text-sm font-semibold text-zinc-950 shadow-md transition-all hover:bg-teal-400 hover:shadow-teal-500/25 cursor-pointer"
             >
               <span>Explore Resource Catalog</span>
               <ArrowRight className="h-4 w-4" />
@@ -95,7 +103,7 @@ export default async function HomePage() {
 
             <Link
               href="/reservations"
-              className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800/80 px-5 py-3 text-sm font-semibold text-zinc-200 transition-all hover:bg-zinc-700 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800/80 px-5 py-3 text-sm font-semibold text-zinc-200 transition-all hover:bg-zinc-700 hover:text-white cursor-pointer"
             >
               <span>View Team Schedule</span>
             </Link>
@@ -152,6 +160,11 @@ export default async function HomePage() {
           <p className="mt-1 text-xs text-zinc-500">Pre-seeded accounts</p>
         </div>
       </section>
+
+      {/* Feature 3: Facility Utilization & Peak-Hour Analytics Widget (RBAC: Admin Only) */}
+      {isAdmin && operationsAnalytics && (
+        <OperationsInsightsWidget analytics={operationsAnalytics} />
+      )}
 
       {/* Categories Bar */}
       <section className="space-y-4">
@@ -258,34 +271,25 @@ export default async function HomePage() {
                     <span>•</span>
                     <span>{res.resource.location}</span>
                     <span>•</span>
-                    <span>Organized by {res.user.name} ({res.user.department})</span>
+                    <span>
+                      {formatTimeRange(res.startTime, res.endTime)}
+                    </span>
                   </div>
                 </div>
 
-                <div className="text-xs font-medium text-zinc-600 dark:text-zinc-400 bg-zinc-100/80 dark:bg-zinc-800/80 px-3 py-1.5 rounded-lg shrink-0">
-                  {formatTimeRange(res.startTime, res.endTime)}
+                <div className="text-xs text-zinc-500 flex items-center gap-2 self-start sm:self-auto">
+                  <span>Reserved by</span>
+                  <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                    {res.user.name}
+                  </span>
+                  {res.user.department && (
+                    <span className="bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded text-[11px]">
+                      {res.user.department}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Progress / Next Step Roadmap Note */}
-      <section className="rounded-2xl border border-teal-200 bg-teal-50/50 p-6 dark:border-teal-900/60 dark:bg-teal-950/20">
-        <div className="flex items-start gap-4">
-          <div className="rounded-xl bg-teal-600 p-2 text-white shadow-sm">
-            <ShieldCheck className="h-6 w-6" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-bold text-teal-950 dark:text-teal-200">
-              Basic Step Complete: Foundation & Database Ready
-            </h3>
-            <p className="text-sm text-teal-800 dark:text-teal-300/90 leading-relaxed">
-              The project structure, PostgreSQL database schema (User, Category, Resource, Reservation),
-              singleton Prisma client, utilities, and base layout are fully configured and seeded.
-              We are ready to proceed with <strong>Authentication & Role-Based Access Control (RBAC)</strong> when you are ready.
-            </p>
           </div>
         </div>
       </section>

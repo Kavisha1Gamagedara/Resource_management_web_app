@@ -6,6 +6,8 @@ import prisma from "@/lib/db";
 import { Badge } from "@/components/ui/Badge";
 import { AdminResourceTable } from "@/components/admin/AdminResourceTable";
 import { PendingApprovalsSection } from "@/components/admin/PendingApprovalsSection";
+import { getOperationsAnalytics } from "@/lib/analytics";
+import { OperationsInsightsWidget } from "@/components/dashboard/OperationsInsightsWidget";
 import {
   ShieldAlert,
   ShieldCheck,
@@ -72,8 +74,8 @@ export default async function AdminDashboardPage() {
     );
   }
 
-  // User is verified ADMIN: Query all resources and pending private reservations
-  const [resources, categories, pendingReservations] = await Promise.all([
+  // User is verified ADMIN: Query all resources, pending private reservations, and operations telemetry
+  const [resources, categories, pendingReservations, operationsAnalytics] = await Promise.all([
     prisma.resource.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -106,6 +108,7 @@ export default async function AdminDashboardPage() {
       },
       orderBy: { createdAt: "desc" },
     }),
+    getOperationsAnalytics(),
   ]);
 
   const activeCount = resources.filter((r) => r.status === "ACTIVE").length;
@@ -176,6 +179,9 @@ export default async function AdminDashboardPage() {
           <span className="text-[11px] text-zinc-400">Soft-deactivated items</span>
         </div>
       </div>
+
+      {/* Facility Utilization & Peak-Hour Analytics (RBAC: Admin View) */}
+      <OperationsInsightsWidget analytics={operationsAnalytics} />
 
       {/* Pending Private Approvals (Requires Admin Review) */}
       <PendingApprovalsSection initialPending={pendingReservations as any} />
