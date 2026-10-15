@@ -1,5 +1,5 @@
 {
-  "name": "resource-reservation-system",
+  "name": "primewave-resource-hub",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,13 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio",
-    "test": "tsx tests/conflict-detection.ts"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "test": "tsx tests/conflict-detection.ts && tsx tests/ghost-booking.ts && tsx tests/turnaround-buffer.ts && tsx tests/admin-user-creation.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -40,5 +34,8 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }

@@ -13,7 +13,7 @@ import {
   LogIn,
   LogOut,
   ChevronDown,
-  LayoutDashboard,
+  Home,
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 
@@ -37,7 +37,7 @@ export function Navbar() {
   const isAdmin = session?.user?.role === "ADMIN";
 
   const navItems = [
-    { label: "Dashboard", href: "/", icon: LayoutDashboard },
+    { label: "Home", href: "/", icon: Home },
     { label: "Resources", href: "/resources", icon: Layers },
     ...(isAdmin ? [{ label: "Team Schedule", href: "/reservations", icon: CalendarDays }] : []),
     { label: "My Bookings", href: "/my-reservations", icon: BookmarkCheck },
