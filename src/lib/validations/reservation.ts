@@ -11,6 +11,7 @@ export const reservationSchema = z
     startTime: z.coerce.date({ message: "Invalid start time format" }),
     endTime: z.coerce.date({ message: "Invalid end time format" }),
     isPrivate: z.boolean().default(false),
+    autoRelease: z.boolean().default(true).optional(),
   })
   .refine(
     (data) => {

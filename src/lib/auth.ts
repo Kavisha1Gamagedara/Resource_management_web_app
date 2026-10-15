@@ -1,7 +1,7 @@
-import { NextAuthOptions, getServerSession } from "next-auth";
+import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
-import prisma from "@/lib/db";
 import { Role } from "@prisma/client";
 
 export const authOptions: NextAuthOptions = {
@@ -16,12 +16,12 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email", placeholder: "user@primewave.com" },
+        email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("Please enter both email and password.");
+          throw new Error("Please enter both email and password");
         }
 
         const user = await prisma.user.findUnique({
@@ -29,18 +29,22 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user || !user.passwordHash) {
-          throw new Error("No account found with this email address.");
+          throw new Error("No user found with this email");
         }
 
-        const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
-        if (!isValid) {
-          throw new Error("Invalid password. Please check your credentials.");
+        const isPasswordValid = await bcrypt.compare(
+          credentials.password,
+          user.passwordHash
+        );
+
+        if (!isPasswordValid) {
+          throw new Error("Incorrect password");
         }
 
         return {
           id: user.id,
-          name: user.name,
           email: user.email,
+          name: user.name,
           role: user.role,
           department: user.department,
           avatarUrl: user.avatarUrl,
@@ -52,58 +56,44 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = user.role;
+        token.role = user.role as Role;
         token.department = user.department;
         token.avatarUrl = user.avatarUrl;
       }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
+      if (session.user && token) {
         session.user.id = token.id as string;
         session.user.role = token.role as Role;
-        session.user.department = token.department as string | null | undefined;
-        session.user.avatarUrl = token.avatarUrl as string | null | undefined;
+        session.user.department = token.department as string | null;
+        session.user.avatarUrl = token.avatarUrl as string | null;
       }
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET || "primewave-resource-reservation-secret-key-32chars",
+  secret: process.env.NEXTAUTH_SECRET || "primewave-dev-secret-key-32-chars-fallback",
 };
 
-/**
- * Server-side helper to retrieve the current authenticated session
- */
-export async function getSession() {
-  return await getServerSession(authOptions);
-}
+import { getServerSession } from "next-auth";
 
-/**
- * Server-side helper to retrieve the current authenticated user
- */
 export async function getCurrentUser() {
-  const session = await getSession();
+  const session = await getServerSession(authOptions);
   return session?.user ?? null;
 }
 
-/**
- * Server-side guard requiring authentication
- */
 export async function requireAuth() {
   const user = await getCurrentUser();
   if (!user) {
-    throw new Error("Authentication required to perform this action.");
+    throw new Error("Unauthorized: You must be signed in to perform this action.");
   }
   return user;
 }
 
-/**
- * Server-side guard requiring ADMIN role
- */
 export async function requireAdmin() {
   const user = await requireAuth();
   if (user.role !== Role.ADMIN) {
-    throw new Error("Access denied: Administrator privileges required.");
+    throw new Error("Forbidden: Administrator privileges required.");
   }
   return user;
 }

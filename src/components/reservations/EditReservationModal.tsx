@@ -2,37 +2,23 @@
 
 import React, { useState, useEffect } from "react";
 import { format, setHours, setMinutes } from "date-fns";
-import {
-  X,
-  Clock,
-  Calendar,
-  AlertTriangle,
-  CheckCircle2,
-  Loader2,
-  FileText,
-  Building2,
-  Lock,
-} from "lucide-react";
-import { updateReservation, checkLiveConflict } from "@/lib/actions/reservations";
-
-interface ReservationToEdit {
-  id: string;
-  title: string;
-  notes?: string | null;
-  startTime: Date | string;
-  endTime: Date | string;
-  resourceId: string;
-  isPrivate?: boolean;
-  resource: {
-    name: string;
-    location: string;
-  };
-}
+import { X, Clock, Calendar, AlertTriangle, Loader2 } from "lucide-react";
+import { updateReservation } from "@/lib/actions/reservations";
 
 interface EditReservationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  reservation: ReservationToEdit | null;
+  reservation: {
+    id: string;
+    title: string;
+    notes?: string | null;
+    startTime: Date | string;
+    endTime: Date | string;
+    resourceId: string;
+    resource: {
+      name: string;
+    };
+  } | null;
   onSuccess: (updated: any) => void;
 }
 
@@ -47,32 +33,27 @@ export function EditReservationModal({
   const [startTimeStr, setStartTimeStr] = useState("10:00");
   const [endTimeStr, setEndTimeStr] = useState("11:00");
   const [notes, setNotes] = useState("");
-  const [isPrivate, setIsPrivate] = useState(false);
-
-  const [conflictWarning, setConflictWarning] = useState<string | null>(null);
-  const [isCheckingConflict, setIsCheckingConflict] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (reservation) {
+    if (reservation && isOpen) {
+      setTitle(reservation.title);
+      setNotes(reservation.notes || "");
       const start = new Date(reservation.startTime);
       const end = new Date(reservation.endTime);
-
-      setTitle(reservation.title);
       setDateStr(format(start, "yyyy-MM-dd"));
       setStartTimeStr(format(start, "HH:mm"));
       setEndTimeStr(format(end, "HH:mm"));
-      setNotes(reservation.notes || "");
-      setIsPrivate(Boolean(reservation.isPrivate));
-      setConflictWarning(null);
       setError(null);
     }
   }, [reservation, isOpen]);
 
-  // Debounced live conflict checking with self-exclusion
-  useEffect(() => {
-    if (!isOpen || !reservation || !dateStr || !startTimeStr || !endTimeStr) return;
+  if (!isOpen || !reservation) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
 
     const [startH, startM] = startTimeStr.split(":").map(Number);
     const [endH, endM] = endTimeStr.split(":").map(Number);
@@ -82,72 +63,29 @@ export function EditReservationModal({
     const end = setMinutes(setHours(baseDate, endH), endM);
 
     if (end <= start) {
-      setConflictWarning("End time must be later than start time.");
+      setError("End time must be later than start time.");
       return;
     }
-
-    if (start.getTime() < Date.now() - 60 * 1000) {
-      setConflictWarning("Cannot set reservation to a time in the past. Please select an upcoming date and time.");
-      return;
-    }
-
-    setIsCheckingConflict(true);
-    const timer = setTimeout(async () => {
-      const res = await checkLiveConflict({
-        resourceId: reservation.resourceId,
-        startTime: start,
-        endTime: end,
-        excludeReservationId: reservation.id, // Self-exclusion!
-      });
-      setIsCheckingConflict(false);
-
-      if (res.hasConflict && res.message) {
-        setConflictWarning(res.message);
-      } else {
-        setConflictWarning(null);
-      }
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [isOpen, dateStr, startTimeStr, endTimeStr, reservation]);
-
-  if (!isOpen || !reservation) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (conflictWarning) {
-      setError("Cannot update: Please resolve the scheduling conflict first.");
-      return;
-    }
-
-    const [startH, startM] = startTimeStr.split(":").map(Number);
-    const [endH, endM] = endTimeStr.split(":").map(Number);
-
-    const baseDate = new Date(`${dateStr}T00:00:00`);
-    const start = setMinutes(setHours(baseDate, startH), startM);
-    const end = setMinutes(setHours(baseDate, endH), endM);
 
     setIsSubmitting(true);
 
     try {
-      const result = await updateReservation(reservation.id, {
+      const res = await updateReservation(reservation.id, {
         resourceId: reservation.resourceId,
         title: title.trim(),
         notes: notes.trim() || null,
         startTime: start,
         endTime: end,
-        isPrivate,
+        isPrivate: false,
       });
 
       setIsSubmitting(false);
 
-      if (result.success && result.reservation) {
-        onSuccess(result.reservation);
+      if (res.success && res.reservation) {
+        onSuccess(res.reservation);
         onClose();
       } else {
-        setError(result.error || "Update failed.");
+        setError(res.error || "Failed to update reservation.");
       }
     } catch (err: any) {
       setIsSubmitting(false);
@@ -157,181 +95,111 @@ export function EditReservationModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 overflow-y-auto max-h-[90vh]">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-4">
+      <div className="relative w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="flex items-center justify-between border-b border-zinc-100 pb-4 dark:border-zinc-800">
           <div>
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-              Edit Reservation
+            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+              Edit Reservation Slot
             </h3>
             <p className="text-xs text-zinc-500">
-              {reservation.resource.name} • {reservation.resource.location}
+              Reschedule &ldquo;{reservation.resource.name}&rdquo;
             </p>
           </div>
-
           <button
             onClick={onClose}
-            className="rounded-xl p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
+            className="rounded-xl p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Conflict Warning */}
-        {conflictWarning && (
-          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-300">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
-              <div>
-                <span className="font-bold">Time Conflict Detected</span>
-                <p className="mt-0.5 leading-relaxed">{conflictWarning}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Slot Available Indicator */}
-        {!conflictWarning && !isCheckingConflict && (
-          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-            <span>Updated time slot is free! (Self-exclusion active)</span>
-          </div>
-        )}
-
         {error && (
-          <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
-            {error}
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4 text-xs">
-          {/* Title */}
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">
           <div>
             <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-              Meeting / Purpose Title *
+              Title *
             </label>
             <input
               type="text"
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 p-2.5 text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
+              className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
 
-          {/* Date Picker */}
           <div>
             <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-              Reservation Date *
+              Date *
             </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-              <input
-                type="date"
-                required
-                min={format(new Date(), "yyyy-MM-dd")}
-                value={dateStr}
-                onChange={(e) => setDateStr(e.target.value)}
-                className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 pl-9 pr-3 text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
-              />
-            </div>
+            <input
+              type="date"
+              required
+              value={dateStr}
+              onChange={(e) => setDateStr(e.target.value)}
+              className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
+            />
           </div>
 
-          {/* Time Pickers */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                 Start Time *
               </label>
-              <div className="relative">
-                <Clock className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-                <input
-                  type="time"
-                  required
-                  min={dateStr === format(new Date(), "yyyy-MM-dd") ? format(new Date(), "HH:mm") : undefined}
-                  value={startTimeStr}
-                  onChange={(e) => setStartTimeStr(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 pl-9 pr-3 text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
-                />
-              </div>
+              <input
+                type="time"
+                required
+                value={startTimeStr}
+                onChange={(e) => setStartTimeStr(e.target.value)}
+                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
+              />
             </div>
 
             <div>
               <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                 End Time *
               </label>
-              <div className="relative">
-                <Clock className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-                <input
-                  type="time"
-                  required
-                  min={startTimeStr || undefined}
-                  value={endTimeStr}
-                  onChange={(e) => setEndTimeStr(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 py-2.5 pl-9 pr-3 text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
-                />
-              </div>
+              <input
+                type="time"
+                required
+                value={endTimeStr}
+                onChange={(e) => setEndTimeStr(e.target.value)}
+                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
+              />
             </div>
           </div>
 
-          {dateStr === format(new Date(), "yyyy-MM-dd") && (
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 -mt-1">
-              <Clock className="h-3 w-3 text-teal-600 dark:text-teal-400 shrink-0" />
-              <span>
-                Rescheduling for today: Must select an upcoming time slot passing current time ({format(new Date(), "h:mm a")}).
-              </span>
-            </p>
-          )}
-
-          {/* Notes */}
           <div>
             <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-              Notes (Optional)
+              Notes
             </label>
             <textarea
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-xl border border-zinc-200 bg-zinc-50/50 p-2.5 text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
+              className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
 
-          {/* Private Toggle */}
-          <div className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-3.5 dark:border-amber-900/50 dark:bg-amber-950/20">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isPrivate}
-                onChange={(e) => setIsPrivate(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500 dark:border-amber-700 dark:bg-zinc-900"
-              />
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950 dark:text-amber-200">
-                  <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                  <span>Mark as Private Reservation</span>
-                </div>
-                <p className="text-[11px] text-amber-900/80 dark:text-amber-300/80 leading-relaxed">
-                  Meeting title and notes remain confidential. Non-admin colleagues will only see that this slot is occupied.
-                </p>
-              </div>
-            </label>
-          </div>
-
-          {/* Actions */}
           <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="rounded-xl border border-zinc-200 px-4 py-2 font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 transition-colors"
+              className="rounded-xl border border-zinc-200 px-4 py-2 font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 transition-colors cursor-pointer"
             >
               Cancel
             </button>
-
             <button
               type="submit"
-              disabled={isSubmitting || Boolean(conflictWarning)}
-              className="flex items-center gap-2 rounded-xl bg-teal-600 px-5 py-2 font-semibold text-white shadow-sm hover:bg-teal-500 disabled:opacity-50 transition-all"
+              disabled={isSubmitting}
+              className="flex items-center gap-1.5 rounded-xl bg-teal-600 px-5 py-2 font-semibold text-white shadow-sm hover:bg-teal-500 transition-all cursor-pointer disabled:opacity-50"
             >
               {isSubmitting ? (
                 <>

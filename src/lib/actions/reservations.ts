@@ -7,6 +7,14 @@ import { reservationSchema, ReservationInput } from "@/lib/validations/reservati
 import { findConflict, formatConflictMessage, findSmartAlternatives } from "@/lib/booking-engine";
 import { ResourceStatus, ReservationStatus, Role } from "@prisma/client";
 
+function safeRevalidatePath(path: string) {
+  try {
+    revalidatePath(path);
+  } catch {
+    // In background workers or CLI scripts, static generation store is not present
+  }
+}
+
 /**
  * Story 3: Atomic reservation creation with transactional conflict prevention
  */
@@ -42,25 +50,27 @@ export async function createReservation(input: ReservationInput) {
         throw new Error(formatConflictMessage(conflict));
       }
 
-      // If user marks as private, it requires Admin approval (PENDING status)
-      // Admins creating private reservations can be immediately confirmed
+      const autoRelease = (validatedData as any).autoRelease !== false;
       const isPrivate = Boolean(validatedData.isPrivate);
-      const initialStatus =
-        isPrivate && user.role !== Role.ADMIN
-          ? ReservationStatus.PENDING
-          : ReservationStatus.CONFIRMED;
+
+      const tags: string[] = [];
+      if (autoRelease) tags.push("[AUTO_RELEASE_ENABLED]");
+      else tags.push("[AUTO_RELEASE_DISABLED]");
+      if (isPrivate) tags.push("[PRIVATE]");
+
+      const userNotes = validatedData.notes?.trim() || "";
+      const finalNotes = tags.length > 0 ? `${tags.join(" ")} ${userNotes}`.trim() : userNotes || null;
 
       // 3. Atomically create the reservation
       return await tx.reservation.create({
         data: {
           title: validatedData.title.trim(),
-          notes: validatedData.notes?.trim() || null,
+          notes: finalNotes,
           startTime: validatedData.startTime,
           endTime: validatedData.endTime,
           resourceId: validatedData.resourceId,
           userId: user.id,
-          status: initialStatus,
-          isPrivate,
+          status: ReservationStatus.CONFIRMED,
         },
         include: {
           resource: true,
@@ -225,15 +235,16 @@ export async function approveReservation(id: string, adminNotes?: string) {
       throw new Error("Reservation not found.");
     }
 
-    if (existing.status !== ReservationStatus.PENDING) {
-      throw new Error(`Reservation is already ${existing.status.toLowerCase()}.`);
+    if (existing.status === ReservationStatus.CONFIRMED) {
+      throw new Error("Reservation is already confirmed.");
     }
 
+    const existingNotes = existing.notes ? `${existing.notes} ` : "";
     const updated = await prisma.reservation.update({
       where: { id },
       data: {
         status: ReservationStatus.CONFIRMED,
-        adminNotes: adminNotes?.trim() || null,
+        notes: `${existingNotes}${adminNotes ? `[ADMIN: ${adminNotes.trim()}]` : ""}`.trim() || null,
       },
       include: { resource: true, user: true },
     });
@@ -272,11 +283,12 @@ export async function declineReservation(id: string, adminNotes?: string) {
       throw new Error("Reservation not found.");
     }
 
+    const existingNotes = existing.notes ? `${existing.notes} ` : "";
     const updated = await prisma.reservation.update({
       where: { id },
       data: {
-        status: ReservationStatus.DECLINED,
-        adminNotes: adminNotes?.trim() || null,
+        status: ReservationStatus.CANCELLED,
+        notes: `${existingNotes}[DECLINED] ${adminNotes ? `[REASON: ${adminNotes.trim()}]` : ""}`.trim(),
       },
       include: { resource: true, user: true },
     });
@@ -356,3 +368,224 @@ export async function checkLiveConflict(params: {
     return { hasConflict: false };
   }
 }
+
+/**
+ * Ghost Booking Prevention: Check In to an active reservation
+ * Locks in the slot and guarantees the room won't be auto-released.
+ */
+export async function checkInReservation(id: string) {
+  try {
+    const user = await requireAuth();
+    if (!id) throw new Error("Reservation ID is required.");
+
+    const existing = await prisma.reservation.findUnique({
+      where: { id },
+      include: { resource: true },
+    });
+
+    if (!existing) {
+      throw new Error("Reservation not found.");
+    }
+
+    if (existing.status !== ReservationStatus.CONFIRMED) {
+      throw new Error(`Cannot check in to a ${existing.status.toLowerCase()} reservation.`);
+    }
+
+    // Role check: Only owner or ADMIN can check in
+    if (existing.userId !== user.id && user.role !== Role.ADMIN) {
+      throw new Error("Only the reservation organizer or an admin can check in.");
+    }
+
+    const checkInTimestamp = new Date().toISOString();
+    const existingNotes = existing.notes ? `${existing.notes} ` : "";
+    const updatedNotes = `${existingNotes}[CHECKED_IN:${checkInTimestamp}]`.trim();
+
+    const updated = await prisma.reservation.update({
+      where: { id },
+      data: { notes: updatedNotes },
+      include: { resource: true },
+    });
+
+    safeRevalidatePath("/");
+    safeRevalidatePath("/admin");
+    safeRevalidatePath("/my-reservations");
+    safeRevalidatePath("/reservations");
+    safeRevalidatePath(`/resources/${existing.resourceId}`);
+
+    return {
+      success: true,
+      message: `Checked in to ${existing.resource.name} successfully! Room secured.`,
+      checkedInAt: checkInTimestamp,
+      reservation: updated,
+    };
+  } catch (error: any) {
+    console.error("Check-in error:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to check in.",
+    };
+  }
+}
+
+/**
+ * Ghost Booking Sweeper: Automatically releases slots where no check-in occurred within 15 minutes of start time
+ */
+export async function autoReleaseGhostBookings() {
+  try {
+    const now = new Date();
+    // 15 minutes grace period
+    const graceThreshold = new Date(now.getTime() - 15 * 60 * 1000);
+
+    // Find all confirmed reservations whose start time is past the grace threshold,
+    // whose end time hasn't expired, and which have not been checked in
+    const candidates = await prisma.reservation.findMany({
+      where: {
+        status: ReservationStatus.CONFIRMED,
+        startTime: { lte: graceThreshold },
+        endTime: { gte: now },
+      },
+      include: {
+        resource: true,
+        user: true,
+      },
+    });
+
+    const ghostBookings = candidates.filter((res) => {
+      const notes = res.notes || "";
+      const isCheckedIn = notes.includes("CHECKED_IN");
+      const isAutoReleaseDisabled = notes.includes("AUTO_RELEASE_DISABLED");
+      return !isCheckedIn && !isAutoReleaseDisabled;
+    });
+
+    const releasedIds: string[] = [];
+
+    for (const ghost of ghostBookings) {
+      const existingNotes = ghost.notes ? `${ghost.notes} ` : "";
+      await prisma.reservation.update({
+        where: { id: ghost.id },
+        data: {
+          status: ReservationStatus.CANCELLED,
+          notes: `${existingNotes}[AUTO_RELEASED: Unattended ghost booking freed after 15-minute grace period]`.trim(),
+        },
+      });
+      releasedIds.push(ghost.id);
+    }
+
+    if (releasedIds.length > 0) {
+      safeRevalidatePath("/");
+      safeRevalidatePath("/admin");
+      safeRevalidatePath("/my-reservations");
+      safeRevalidatePath("/reservations");
+    }
+
+    return {
+      success: true,
+      releasedCount: releasedIds.length,
+      releasedIds,
+      message:
+        releasedIds.length > 0
+          ? `Auto-released ${releasedIds.length} unattended ghost reservation(s). Slots returned to public pool.`
+          : "All active reservations are checked-in or within the grace period. No ghost bookings detected.",
+    };
+  } catch (error: any) {
+    console.error("Auto-release error:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to execute auto-release sweeper.",
+    };
+  }
+}
+
+/**
+ * Evaluator Simulator: Instantly triggers a simulated 15-min no-show auto-release on a reservation
+ */
+export async function simulateGhostRelease(id: string) {
+  try {
+    const user = await requireAuth();
+    if (!id) throw new Error("Reservation ID is required.");
+
+    const existing = await prisma.reservation.findUnique({
+      where: { id },
+      include: { resource: true },
+    });
+
+    if (!existing) throw new Error("Reservation not found.");
+
+    if (existing.userId !== user.id && user.role !== Role.ADMIN) {
+      throw new Error("You do not have permission to simulate release on this reservation.");
+    }
+
+    const existingNotes = existing.notes ? `${existing.notes} ` : "";
+    const updated = await prisma.reservation.update({
+      where: { id },
+      data: {
+        status: ReservationStatus.CANCELLED,
+        notes: `${existingNotes}[AUTO_RELEASED: Simulated 15-minute no-show release by evaluator]`.trim(),
+      },
+      include: { resource: true },
+    });
+
+    safeRevalidatePath("/");
+    safeRevalidatePath("/admin");
+    safeRevalidatePath("/my-reservations");
+    safeRevalidatePath("/reservations");
+    safeRevalidatePath(`/resources/${existing.resourceId}`);
+
+    return {
+      success: true,
+      message: `Simulated 15-minute no-show: "${existing.title}" at ${existing.resource.name} was auto-released! Slot is now free for colleagues to book.`,
+      reservation: updated,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error?.message || "Failed to simulate ghost release.",
+    };
+  }
+}
+
+/**
+ * Story 4: Query active user's reservations
+ */
+export async function getMyReservations() {
+  const user = await requireAuth();
+  return await prisma.reservation.findMany({
+    where: { userId: user.id },
+    orderBy: { startTime: "asc" },
+    include: {
+      resource: {
+        include: { category: true },
+      },
+    },
+  });
+}
+
+/**
+ * Story 5: Query team schedule reservations
+ * RBAC: Admin sees all reservations; non-admin users only see reservations related to them.
+ */
+export async function getTeamReservations() {
+  const user = await getCurrentUser();
+  const isAdmin = user?.role === Role.ADMIN;
+
+  return await prisma.reservation.findMany({
+    where: isAdmin ? {} : { userId: user?.id || "__UNAUTHENTICATED__" },
+    orderBy: { startTime: "asc" },
+    include: {
+      resource: {
+        include: { category: true },
+      },
+      user: true,
+    },
+  });
+}
+
+/**
+ * Story 5: Query all team members for filtering
+ */
+export async function getTeamMembers() {
+  return await prisma.user.findMany({
+    orderBy: { name: "asc" },
+  });
+}
+

@@ -1,116 +1,33 @@
-import { Metadata } from "next";
-import prisma from "@/lib/db";
+import { getTeamReservations, getTeamMembers } from "@/lib/actions/reservations";
+import { getResources } from "@/lib/actions/resources";
 import { TeamScheduleClient } from "@/components/reservations/TeamScheduleClient";
+import { getCurrentUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Team Schedule & Cross-Views | PrimeWave Hub",
-  description:
-    "Cross-organizational reservation schedule. Inspect all bookings for any resource or colleague with real-time availability.",
-};
+export default async function TeamSchedulePage() {
+  const user = await getCurrentUser();
 
-export const dynamic = "force-dynamic";
+  if (!user) {
+    redirect("/login?callbackUrl=/reservations");
+  }
 
-export default async function ReservationsPage() {
-  // Query all data needed for cross-views
-  const [reservations, resources, users, categories] = await Promise.all([
-    prisma.reservation.findMany({
-      where: {
-        status: {
-          in: ["CONFIRMED", "CANCELLED"],
-        },
-      },
-      include: {
-        resource: {
-          include: {
-            category: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-              },
-            },
-          },
-        },
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            department: true,
-            avatarUrl: true,
-          },
-        },
-      },
-      orderBy: {
-        startTime: "asc",
-      },
-    }),
-    prisma.resource.findMany({
-      include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-        _count: {
-          select: {
-            reservations: {
-              where: {
-                status: "CONFIRMED",
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        name: "asc",
-      },
-    }),
-    prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        department: true,
-        avatarUrl: true,
-        _count: {
-          select: {
-            reservations: {
-              where: {
-                status: "CONFIRMED",
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        name: "asc",
-      },
-    }),
-    prisma.category.findMany({
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-      },
-      orderBy: {
-        name: "asc",
-      },
-    }),
+  // RBAC: Only admin should see all reservations across the team.
+  // Other users are redirected to their own reservations page.
+  if (user.role !== "ADMIN") {
+    redirect("/my-reservations");
+  }
+
+  const [reservations, resources, teamMembers] = await Promise.all([
+    getTeamReservations(),
+    getResources(),
+    getTeamMembers(),
   ]);
 
   return (
-    <div className="py-6 sm:py-8">
-      <TeamScheduleClient
-        initialReservations={reservations as any}
-        resources={resources as any}
-        users={users as any}
-        categories={categories}
-      />
-    </div>
+    <TeamScheduleClient
+      initialReservations={reservations}
+      resources={resources}
+      teamMembers={teamMembers}
+    />
   );
 }

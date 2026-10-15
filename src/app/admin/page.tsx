@@ -4,8 +4,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { Badge } from "@/components/ui/Badge";
-import { AdminResourceTable } from "@/components/admin/AdminResourceTable";
-import { PendingApprovalsSection } from "@/components/admin/PendingApprovalsSection";
+import { AdminDashboardClient } from "@/components/admin/AdminDashboardClient";
 import { getOperationsAnalytics } from "@/lib/analytics";
 import { OperationsInsightsWidget } from "@/components/dashboard/OperationsInsightsWidget";
 import {
@@ -74,8 +73,8 @@ export default async function AdminDashboardPage() {
     );
   }
 
-  // User is verified ADMIN: Query all resources, pending private reservations, and operations telemetry
-  const [resources, categories, pendingReservations, operationsAnalytics] = await Promise.all([
+  // User is verified ADMIN: Query all resources and operations telemetry
+  const [resources, categories, operationsAnalytics] = await Promise.all([
     prisma.resource.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -87,26 +86,6 @@ export default async function AdminDashboardPage() {
     }),
     prisma.category.findMany({
       orderBy: { name: "asc" },
-    }),
-    prisma.reservation.findMany({
-      where: {
-        status: "PENDING",
-      },
-      include: {
-        resource: {
-          include: { category: true },
-        },
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            department: true,
-            avatarUrl: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
     }),
     getOperationsAnalytics(),
   ]);
@@ -183,11 +162,8 @@ export default async function AdminDashboardPage() {
       {/* Facility Utilization & Peak-Hour Analytics (RBAC: Admin View) */}
       <OperationsInsightsWidget analytics={operationsAnalytics} />
 
-      {/* Pending Private Approvals (Requires Admin Review) */}
-      <PendingApprovalsSection initialPending={pendingReservations as any} />
-
-      {/* Interactive Resources Management Table */}
-      <AdminResourceTable initialResources={resources} categories={categories} />
+      {/* Interactive Resources Management Table (Story 1: Add, Edit, Deactivate) */}
+      <AdminDashboardClient initialResources={resources} categories={categories} />
     </div>
   );
 }
