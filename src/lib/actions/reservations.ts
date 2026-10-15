@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import prisma from "@/lib/db";
 import { requireAuth, requireAdmin, getCurrentUser } from "@/lib/auth";
 import { reservationSchema, ReservationInput } from "@/lib/validations/reservation";
-import { findConflict, formatConflictMessage } from "@/lib/booking-engine";
+import { findConflict, formatConflictMessage, findSmartAlternatives } from "@/lib/booking-engine";
 import { ResourceStatus, ReservationStatus, Role } from "@prisma/client";
 
 /**
@@ -331,6 +331,13 @@ export async function checkLiveConflict(params: {
     });
 
     if (conflict) {
+      const suggestions = await findSmartAlternatives(prisma, {
+        resourceId: params.resourceId,
+        startTime: start,
+        endTime: end,
+        excludeReservationId: params.excludeReservationId,
+      });
+
       return {
         hasConflict: true,
         message: formatConflictMessage(conflict),
@@ -340,6 +347,7 @@ export async function checkLiveConflict(params: {
           endTime: conflict.endTime,
           organizer: conflict.user.name,
         },
+        suggestions,
       };
     }
 

@@ -1,5 +1,5 @@
 import { PrismaClient, ResourceStatus, ReservationStatus } from "@prisma/client";
-import { findConflict, hasTimeOverlap } from "../src/lib/booking-engine";
+import { findConflict, hasTimeOverlap, findSmartAlternatives } from "../src/lib/booking-engine";
 import { reservationSchema } from "../src/lib/validations/reservation";
 
 const prisma = new PrismaClient();
@@ -225,6 +225,45 @@ async function runTests() {
       "Test 11: Declined Reservation Releases Slot Immediately",
       "Slot freed immediately after admin decline"
     );
+
+    // 12. Smart Next Available Slot Recommendation
+    const smartSuggestions = await findSmartAlternatives(prisma, {
+      resourceId: testResource.id,
+      startTime: baseStart,
+      endTime: baseEnd,
+    });
+
+    assert(
+      smartSuggestions.nextAvailableSlot !== null &&
+      new Date(smartSuggestions.nextAvailableSlot.startTime).getTime() >= baseEnd.getTime(),
+      "Test 12: Smart Next Available Slot Recommendation",
+      "Correctly suggested valid future slot after conflicting reservation"
+    );
+
+    // 13. Smart Alternative Resource Recommendation in Same Category
+    const siblingResource = await prisma.resource.create({
+      data: {
+        name: `Sibling Suite ${Date.now()}`,
+        categoryId: category.id,
+        location: "Floor 2",
+        status: ResourceStatus.ACTIVE,
+      },
+    });
+
+    const smartWithSibling = await findSmartAlternatives(prisma, {
+      resourceId: testResource.id,
+      startTime: baseStart,
+      endTime: baseEnd,
+    });
+
+    assert(
+      smartWithSibling.alternativeResource !== null &&
+      smartWithSibling.alternativeResource.id !== testResource.id,
+      "Test 13: Smart Sibling Resource Recommendation",
+      "Correctly recommended free alternative resource in same category"
+    );
+
+    await prisma.resource.delete({ where: { id: siblingResource.id } });
 
     // Cleanup test artifacts
     await prisma.reservation.deleteMany({

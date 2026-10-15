@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { format, setHours, setMinutes, parse } from "date-fns";
+import { format, setHours, setMinutes } from "date-fns";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import {
@@ -13,7 +13,7 @@ import {
   Loader2,
   Lock,
   ArrowRight,
-  FileText,
+  Sparkles,
 } from "lucide-react";
 import { createReservation, checkLiveConflict } from "@/lib/actions/reservations";
 
@@ -38,6 +38,9 @@ export function BookingModal({
 }: BookingModalProps) {
   const { data: session } = useSession();
 
+  const [currentResourceId, setCurrentResourceId] = useState(resourceId);
+  const [currentResourceName, setCurrentResourceName] = useState(resourceName);
+
   const [title, setTitle] = useState("");
   const [dateStr, setDateStr] = useState("");
   const [startTimeStr, setStartTimeStr] = useState("10:00");
@@ -46,12 +49,32 @@ export function BookingModal({
   const [isPrivate, setIsPrivate] = useState(false);
 
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
+  const [smartSuggestions, setSmartSuggestions] = useState<{
+    nextAvailableSlot?: {
+      startTime: string;
+      endTime: string;
+      display: string;
+      startHHMM: string;
+      endHHMM: string;
+    } | null;
+    alternativeResource?: {
+      id: string;
+      name: string;
+      location: string;
+      capacity: number | null;
+      categoryName: string;
+    } | null;
+  } | null>(null);
+
   const [isCheckingConflict, setIsCheckingConflict] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Initialize dates
   useEffect(() => {
+    setCurrentResourceId(resourceId);
+    setCurrentResourceName(resourceName);
+
     if (initialStart && initialEnd) {
       setDateStr(format(initialStart, "yyyy-MM-dd"));
       setStartTimeStr(format(initialStart, "HH:mm"));
@@ -68,10 +91,11 @@ export function BookingModal({
     setNotes("");
     setIsPrivate(false);
     setConflictWarning(null);
+    setSmartSuggestions(null);
     setSubmitError(null);
-  }, [initialStart, initialEnd, isOpen]);
+  }, [initialStart, initialEnd, isOpen, resourceId, resourceName]);
 
-  // Story 3: Debounced Live Conflict Probing
+  // Story 3: Debounced Live Conflict Probing with Smart Recommendations
   useEffect(() => {
     if (!isOpen || !dateStr || !startTimeStr || !endTimeStr) return;
 
@@ -84,18 +108,20 @@ export function BookingModal({
 
     if (end <= start) {
       setConflictWarning("End time must be later than start time.");
+      setSmartSuggestions(null);
       return;
     }
 
     if (start.getTime() < Date.now() - 60 * 1000) {
       setConflictWarning("Cannot reserve a slot in the past. Please select an upcoming date and time.");
+      setSmartSuggestions(null);
       return;
     }
 
     setIsCheckingConflict(true);
     const timer = setTimeout(async () => {
       const res = await checkLiveConflict({
-        resourceId,
+        resourceId: currentResourceId,
         startTime: start,
         endTime: end,
       });
@@ -103,15 +129,31 @@ export function BookingModal({
 
       if (res.hasConflict && res.message) {
         setConflictWarning(res.message);
+        setSmartSuggestions((res as any).suggestions || null);
       } else {
         setConflictWarning(null);
+        setSmartSuggestions(null);
       }
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [isOpen, dateStr, startTimeStr, endTimeStr, resourceId]);
+  }, [isOpen, dateStr, startTimeStr, endTimeStr, currentResourceId]);
 
   if (!isOpen) return null;
+
+  const handleApplySlot = (slot: { startHHMM: string; endHHMM: string }) => {
+    setStartTimeStr(slot.startHHMM);
+    setEndTimeStr(slot.endHHMM);
+    setConflictWarning(null);
+    setSmartSuggestions(null);
+  };
+
+  const handleSwitchResource = (alt: { id: string; name: string }) => {
+    setCurrentResourceId(alt.id);
+    setCurrentResourceName(alt.name);
+    setConflictWarning(null);
+    setSmartSuggestions(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,7 +180,7 @@ export function BookingModal({
 
     try {
       const result = await createReservation({
-        resourceId,
+        resourceId: currentResourceId,
         title: title.trim(),
         notes: notes.trim() || null,
         startTime: start,
@@ -167,10 +209,10 @@ export function BookingModal({
         <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-4">
           <div>
             <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-              Reserve {resourceName}
+              Reserve {currentResourceName}
             </h3>
             <p className="text-xs text-zinc-500">
-              Fulfills Story 3: Immediate conflict feedback & atomic booking
+              Story 3: Immediate conflict feedback & atomic booking
             </p>
           </div>
 
@@ -202,9 +244,9 @@ export function BookingModal({
           </div>
         )}
 
-        {/* Live Conflict Warning Banner (Story 3 Flagship UI) */}
+        {/* Live Conflict Warning Banner & Smart Suggestions (Story 3 + Smart Suggestions Flagship UI) */}
         {conflictWarning && (
-          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-300 animate-in fade-in slide-in-from-top-1">
+          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-300 animate-in fade-in slide-in-from-top-1 space-y-3">
             <div className="flex items-start gap-2.5">
               <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
               <div>
@@ -212,6 +254,56 @@ export function BookingModal({
                 <p className="mt-0.5 leading-relaxed">{conflictWarning}</p>
               </div>
             </div>
+
+            {/* Smart Suggestions Card */}
+            {smartSuggestions && (smartSuggestions.nextAvailableSlot || smartSuggestions.alternativeResource) && (
+              <div className="mt-3 pt-3 border-t border-rose-200/80 dark:border-rose-900/60 space-y-2">
+                <div className="flex items-center gap-1.5 font-bold text-zinc-900 dark:text-zinc-100 text-[11px] uppercase tracking-wider">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
+                  <span>Smart Booking Recommendations</span>
+                </div>
+
+                {smartSuggestions.nextAvailableSlot && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200">
+                    <div>
+                      <span className="font-bold block text-[11px] text-amber-700 dark:text-amber-300">
+                        Next Available in {currentResourceName}:
+                      </span>
+                      <span className="text-xs font-semibold">
+                        {smartSuggestions.nextAvailableSlot.display} today
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleApplySlot(smartSuggestions.nextAvailableSlot!)}
+                      className="px-3 py-1 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 transition-colors shadow-sm self-start sm:self-auto cursor-pointer"
+                    >
+                      ? Apply This Time
+                    </button>
+                  </div>
+                )}
+
+                {smartSuggestions.alternativeResource && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-900 dark:text-teal-200">
+                    <div>
+                      <span className="font-bold block text-[11px] text-teal-700 dark:text-teal-300">
+                        Free at this time in {smartSuggestions.alternativeResource.categoryName}:
+                      </span>
+                      <span className="text-xs font-semibold">
+                        {smartSuggestions.alternativeResource.name} ({smartSuggestions.alternativeResource.location})
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchResource(smartSuggestions.alternativeResource!)}
+                      className="px-3 py-1 text-xs font-bold rounded-lg bg-teal-600 hover:bg-teal-500 text-white transition-colors shadow-sm self-start sm:self-auto cursor-pointer"
+                    >
+                      ? Switch Facility
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -374,9 +466,9 @@ export function BookingModal({
               ) : conflictWarning ? (
                 <span>Cannot Book (Conflict)</span>
               ) : isPrivate && session?.user?.role !== "ADMIN" ? (
-                <span>Request Private Slot (Pending Approval) 🔒</span>
+                <span>Request Private Slot (Pending Approval)</span>
               ) : (
-                <span>Confirm Reservation ⚡</span>
+                <span>Confirm Reservation</span>
               )}
             </button>
           </div>
