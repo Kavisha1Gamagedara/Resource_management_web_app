@@ -176,7 +176,7 @@ export function EditReservationModal({
               value={dateStr}
               min={format(new Date(), "yyyy-MM-dd")}
               onChange={(e) => setDateStr(e.target.value)}
-              className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
+              className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 [color-scheme:light] dark:[color-scheme:dark] dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
 
@@ -190,7 +190,7 @@ export function EditReservationModal({
                 required
                 value={startTimeStr}
                 onChange={(e) => setStartTimeStr(e.target.value)}
-                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
+                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 [color-scheme:light] dark:[color-scheme:dark] dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
               />
             </div>
 
@@ -203,7 +203,7 @@ export function EditReservationModal({
                 required
                 value={endTimeStr}
                 onChange={(e) => setEndTimeStr(e.target.value)}
-                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
+                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 [color-scheme:light] dark:[color-scheme:dark] dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
               />
             </div>
           </div>

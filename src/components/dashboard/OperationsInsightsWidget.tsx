@@ -252,7 +252,7 @@ export function OperationsInsightsWidget({ analytics }: OperationsInsightsWidget
               <span>Peak Hours (10 AM - 3 PM)</span>
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+              <span className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-zinc-700" />
               <span>Standard</span>
             </span>
           </div>
@@ -260,7 +260,7 @@ export function OperationsInsightsWidget({ analytics }: OperationsInsightsWidget
 
         {/* The Bar Chart Visualization */}
         <div className="pt-6 pb-2">
-          <div className="flex items-end justify-between gap-1.5 sm:gap-3 h-32 px-1">
+          <div className="flex items-end justify-between gap-1.5 sm:gap-3 h-32 px-1 border-b border-zinc-200 dark:border-zinc-800 pb-1.5">
             {peakHours.hourlyDistribution.map((point) => {
               const heightPct = Math.max(point.percentage, 10);
 
@@ -282,14 +282,14 @@ export function OperationsInsightsWidget({ analytics }: OperationsInsightsWidget
                       className={`w-full rounded-t-lg transition-all duration-300 ${
                         point.isPeak
                           ? "bg-gradient-to-t from-teal-600 to-teal-400 group-hover:from-teal-500 group-hover:to-teal-300 shadow-sm shadow-teal-500/20"
-                          : "bg-zinc-200 dark:bg-zinc-800 group-hover:bg-zinc-300 dark:group-hover:bg-zinc-700"
+                          : "bg-slate-300 group-hover:bg-slate-400 dark:bg-zinc-800 dark:group-hover:bg-zinc-700"
                       }`}
                       style={{ height: `${heightPct}%` }}
                     />
                   </div>
 
                   {/* Hour Label */}
-                  <span className="mt-2 text-[10px] sm:text-xs font-semibold text-zinc-500 group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors">
+                  <span className="mt-2 text-[10px] sm:text-xs font-semibold text-zinc-600 group-hover:text-zinc-900 dark:text-zinc-400 dark:group-hover:text-zinc-100 transition-colors">
                     {point.label}
                   </span>
                 </div>

@@ -16,6 +16,7 @@ import {
   Home,
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -48,25 +49,25 @@ export function Navbar() {
   ];
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full border-b border-slate-200/90 bg-white/85 dark:border-slate-800/80 dark:bg-slate-950/80 backdrop-blur-md transition-colors duration-200">
       <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-10 xl:px-12 h-16 flex items-center justify-between gap-4">
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-cyan-400 p-0.5 shadow-lg shadow-emerald-950/50 group-hover:shadow-emerald-500/20 transition-all duration-300">
-            <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-              <Waves className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-cyan-400 p-0.5 shadow-lg shadow-emerald-950/20 group-hover:shadow-emerald-500/20 transition-all duration-300">
+            <div className="w-full h-full bg-white dark:bg-slate-950 rounded-[10px] flex items-center justify-center transition-colors">
+              <Waves className="w-5 h-5 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
             </div>
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-bold text-base tracking-tight text-white">
+              <span className="font-bold text-base tracking-tight text-slate-900 dark:text-white">
                 PrimeWave
               </span>
-              <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
                 Lab
               </span>
             </div>
-            <p className="text-[10px] text-slate-400 tracking-wider uppercase font-medium">
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 tracking-wider uppercase font-medium">
               Resource Hub
             </p>
           </div>
@@ -87,13 +88,13 @@ export function Navbar() {
                 href={item.href}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
                   isActive
-                    ? "bg-slate-800/90 text-white shadow-sm border border-slate-700/60"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                    ? "bg-emerald-50 text-emerald-900 border border-emerald-200/80 shadow-xs dark:bg-slate-800/90 dark:text-white dark:border-slate-700/60"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/40"
                 }`}
               >
                 <Icon
                   className={`w-4 h-4 ${
-                    isActive ? "text-emerald-400" : "text-slate-400"
+                    isActive ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"
                   }`}
                 />
                 {item.label}
@@ -107,19 +108,22 @@ export function Navbar() {
               href="/admin"
               className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
                 pathname.startsWith("/admin")
-                  ? "bg-purple-950/60 text-purple-200 border border-purple-800/60 shadow-sm"
-                  : "text-slate-400 hover:text-purple-300 hover:bg-purple-950/30"
+                  ? "bg-purple-100 text-purple-900 border border-purple-200/90 shadow-xs dark:bg-purple-950/60 dark:text-purple-200 dark:border-purple-800/60"
+                  : "text-slate-600 hover:text-purple-700 hover:bg-purple-50 dark:text-slate-400 dark:hover:text-purple-300 dark:hover:bg-purple-950/30"
               }`}
             >
-              <ShieldAlert className="w-4 h-4 text-purple-400" />
+              <ShieldAlert className="w-4 h-4 text-purple-600 dark:text-purple-400" />
               Admin Hub
-              <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping" />
+              <span className="w-2 h-2 rounded-full bg-purple-500 animate-ping" />
             </Link>
           )}
         </nav>
 
-        {/* User Profile / Auth State */}
-        <div className="flex items-center gap-2.5">
+        {/* User Profile, Theme Toggle & Auth State */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Light / Dark Mode Toggle */}
+          <ThemeToggle />
+
           {session?.user ? (
             <div className="relative" ref={userMenuRef}>
               <div className="flex items-center gap-2">
@@ -127,13 +131,13 @@ export function Navbar() {
                 <button
                   type="button"
                   onClick={() => setIsUserMenuOpen((prev) => !prev)}
-                  className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-all text-left cursor-pointer group"
+                  className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900 border border-transparent hover:border-slate-200 dark:hover:border-slate-800 transition-all text-left cursor-pointer group"
                   aria-expanded={isUserMenuOpen}
                   aria-haspopup="true"
                 >
                   <div className="text-right hidden sm:block">
                     <div className="flex items-center justify-end gap-1.5">
-                      <span className="text-xs font-semibold text-white group-hover:text-emerald-400 transition-colors">
+                      <span className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                         {session.user.name}
                       </span>
                       <Badge
@@ -143,13 +147,13 @@ export function Navbar() {
                         {session.user.role}
                       </Badge>
                     </div>
-                    <span className="text-[11px] text-slate-400 block truncate max-w-[140px]">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block truncate max-w-[140px]">
                       {session.user.department || session.user.email}
                     </span>
                   </div>
 
                   {/* Avatar */}
-                  <div className="h-9 w-9 rounded-full ring-2 ring-emerald-500/40 overflow-hidden bg-slate-800 flex items-center justify-center font-bold text-xs text-white shrink-0 group-hover:ring-emerald-400 transition-all">
+                  <div className="h-9 w-9 rounded-full ring-2 ring-emerald-500/40 overflow-hidden bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-white shrink-0 group-hover:ring-emerald-400 transition-all">
                     {session.user.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -161,27 +165,27 @@ export function Navbar() {
                       (session.user.name || "U")[0].toUpperCase()
                     )}
                   </div>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-transform hidden sm:block" />
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-transform hidden sm:block" />
                 </button>
 
                 {/* Direct Prominent Sign Out Button */}
                 <button
                   type="button"
                   onClick={() => signOut({ callbackUrl: "/login" })}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-rose-400 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-800/60 transition-all cursor-pointer shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 dark:text-slate-300 dark:hover:text-rose-400 dark:hover:bg-rose-950/40 dark:border-slate-800 dark:hover:border-rose-800/60 transition-all cursor-pointer shadow-2xs"
                   title="Sign out of your session"
                 >
-                  <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                  <LogOut className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
                   <span className="hidden sm:inline">Sign Out</span>
                 </button>
               </div>
 
               {/* Profile Dropdown Menu */}
               {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80 mb-2">
+                <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white border border-slate-200 shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150 dark:bg-slate-900 dark:border-slate-800">
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 mb-2 dark:bg-slate-950/70 dark:border-slate-800/80">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-bold text-white truncate">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
                         {session.user.name}
                       </span>
                       <Badge
@@ -191,11 +195,11 @@ export function Navbar() {
                         {session.user.role}
                       </Badge>
                     </div>
-                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
                       {session.user.email}
                     </p>
                     {session.user.department && (
-                      <p className="text-[10px] text-emerald-400 font-medium mt-1">
+                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-1">
                         Department: {session.user.department}
                       </p>
                     )}
@@ -205,9 +209,9 @@ export function Navbar() {
                     <Link
                       href="/my-reservations"
                       onClick={() => setIsUserMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/80 transition-colors"
                     >
-                      <BookmarkCheck className="w-4 h-4 text-emerald-400" />
+                      <BookmarkCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                       <span>My Bookings</span>
                     </Link>
 
@@ -215,14 +219,14 @@ export function Navbar() {
                       <Link
                         href="/admin"
                         onClick={() => setIsUserMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors"
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/80 transition-colors"
                       >
-                        <ShieldAlert className="w-4 h-4 text-purple-400" />
+                        <ShieldAlert className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                         <span>Admin Hub</span>
                       </Link>
                     )}
 
-                    <div className="my-1 border-t border-slate-800" />
+                    <div className="my-1 border-t border-slate-200 dark:border-slate-800" />
 
                     <button
                       type="button"
@@ -230,7 +234,7 @@ export function Navbar() {
                         setIsUserMenuOpen(false);
                         signOut({ callbackUrl: "/login" });
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-rose-400 hover:bg-rose-950/50 hover:text-rose-300 transition-colors cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:text-rose-400 dark:hover:bg-rose-950/50 dark:hover:text-rose-300 transition-colors cursor-pointer"
                     >
                       <LogOut className="w-4 h-4" />
                       <span>Sign Out</span>
@@ -242,7 +246,7 @@ export function Navbar() {
           ) : (
             <Link
               href="/login"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-md shadow-emerald-950/50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-md shadow-emerald-950/20 cursor-pointer"
             >
               <LogIn className="w-3.5 h-3.5" />
               Sign In
@@ -252,7 +256,7 @@ export function Navbar() {
       </div>
 
       {/* Mobile nav */}
-      <div className="md:hidden flex items-center justify-around border-t border-slate-800/60 bg-slate-950/95 px-2 py-2 text-xs">
+      <div className="md:hidden flex items-center justify-around border-t border-slate-200/90 bg-white/95 dark:border-slate-800/60 dark:bg-slate-950/95 px-2 py-2 text-xs transition-colors">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
@@ -264,7 +268,7 @@ export function Navbar() {
               key={item.href}
               href={item.href}
               className={`flex flex-col items-center gap-1 px-2 py-1 rounded ${
-                isActive ? "text-emerald-400 font-semibold" : "text-slate-400"
+                isActive ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-slate-600 dark:text-slate-400"
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -277,27 +281,28 @@ export function Navbar() {
             href="/admin"
             className={`flex flex-col items-center gap-1 px-2 py-1 rounded ${
               pathname.startsWith("/admin")
-                ? "text-purple-400 font-semibold"
-                : "text-slate-400"
+                ? "text-purple-600 dark:text-purple-400 font-semibold"
+                : "text-slate-600 dark:text-slate-400"
             }`}
           >
             <ShieldAlert className="w-4 h-4" />
             <span>Admin</span>
           </Link>
         )}
+        <ThemeToggle className="h-8 w-8 p-1.5" />
         {session?.user ? (
           <button
             type="button"
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="flex flex-col items-center gap-1 px-2 py-1 rounded text-slate-400 hover:text-rose-400 cursor-pointer"
+            className="flex flex-col items-center gap-1 px-2 py-1 rounded text-slate-600 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 cursor-pointer"
           >
-            <LogOut className="w-4 h-4 text-rose-400" />
+            <LogOut className="w-4 h-4 text-rose-500 dark:text-rose-400" />
             <span className="text-[11px]">Sign Out</span>
           </button>
         ) : (
           <Link
             href="/login"
-            className="flex flex-col items-center gap-1 px-2 py-1 rounded text-emerald-400"
+            className="flex flex-col items-center gap-1 px-2 py-1 rounded text-emerald-600 dark:text-emerald-400"
           >
             <LogIn className="w-4 h-4" />
             <span className="text-[11px]">Sign In</span>

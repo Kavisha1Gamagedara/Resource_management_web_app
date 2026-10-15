@@ -354,26 +354,26 @@ export function AdminDashboardClient({
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
-            <ShieldAlert className="w-7 h-7 text-purple-400" />
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+            <ShieldAlert className="w-7 h-7 text-purple-600 dark:text-purple-400" />
             Admin Operations & Management Hub
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
             Provision company personnel accounts, manage shared facilities, and configure turnaround buffer intervals.
           </p>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           {activeTab === "resources" ? (
-            <Button onClick={openAddModal} size="md" className="shrink-0 bg-purple-600 hover:bg-purple-500 border-purple-500/30">
+            <Button onClick={openAddModal} size="md" className="shrink-0 bg-purple-600 hover:bg-purple-500 border-purple-500/30 text-white">
               <Plus className="w-4 h-4 mr-1.5" /> Add New Resource
             </Button>
           ) : activeTab === "users" ? (
-            <Button onClick={openAddUserModal} size="md" className="shrink-0 bg-emerald-600 hover:bg-emerald-500 border-emerald-500/30">
+            <Button onClick={openAddUserModal} size="md" className="shrink-0 bg-emerald-600 hover:bg-emerald-500 border-emerald-500/30 text-white">
               <UserPlus className="w-4 h-4 mr-1.5" /> Provision New User
             </Button>
           ) : (
-            <Button onClick={() => setIsAdminReservationModalOpen(true)} size="md" className="shrink-0 bg-purple-600 hover:bg-purple-500 border-purple-500/30">
+            <Button onClick={() => setIsAdminReservationModalOpen(true)} size="md" className="shrink-0 bg-purple-600 hover:bg-purple-500 border-purple-500/30 text-white">
               <UserPlus className="w-4 h-4 mr-1.5" /> + Book for User
             </Button>
           )}
@@ -381,19 +381,19 @@ export function AdminDashboardClient({
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
         <button
           type="button"
           onClick={() => setActiveTab("resources")}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center gap-2 transition-all cursor-pointer ${
+          className={`px-4 py-2 text-sm font-semibold rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
             activeTab === "resources"
-              ? "bg-purple-600/20 text-purple-300 border border-purple-500/40 shadow-sm"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+              ? "bg-purple-100 text-purple-900 border border-purple-300 shadow-2xs dark:bg-purple-600/20 dark:text-purple-300 dark:border-purple-500/40 dark:shadow-sm"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50"
           }`}
         >
           <Wrench className="w-4 h-4" />
           <span>Shared Facilities & Gear</span>
-          <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+          <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono dark:bg-slate-800 dark:text-slate-300">
             {initialResources.length}
           </span>
         </button>
@@ -401,15 +401,15 @@ export function AdminDashboardClient({
         <button
           type="button"
           onClick={() => setActiveTab("users")}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center gap-2 transition-all cursor-pointer ${
+          className={`px-4 py-2 text-sm font-semibold rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
             activeTab === "users"
-              ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+              ? "bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs dark:bg-emerald-600/20 dark:text-emerald-300 dark:border-emerald-500/40 dark:shadow-sm"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50"
           }`}
         >
           <Users className="w-4 h-4" />
           <span>Company Personnel & RBAC</span>
-          <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-800 text-emerald-300 font-mono">
+          <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono dark:bg-emerald-950/80 dark:border-emerald-800 dark:text-emerald-300">
             {initialUsers.length}
           </span>
         </button>
@@ -417,15 +417,15 @@ export function AdminDashboardClient({
         <button
           type="button"
           onClick={() => setActiveTab("reservations")}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center gap-2 transition-all cursor-pointer ${
+          className={`px-4 py-2 text-sm font-semibold rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
             activeTab === "reservations"
-              ? "bg-purple-600/20 text-purple-300 border border-purple-500/40 shadow-sm"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+              ? "bg-purple-100 text-purple-900 border border-purple-300 shadow-2xs dark:bg-purple-600/20 dark:text-purple-300 dark:border-purple-500/40 dark:shadow-sm"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50"
           }`}
         >
           <CalendarDays className="w-4 h-4" />
           <span>All User Reservations</span>
-          <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-purple-950/80 border border-purple-800 text-purple-300 font-mono">
+          <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-purple-800 font-mono dark:bg-purple-950/80 dark:border-purple-800 dark:text-purple-300">
             {initialReservations.length}
           </span>
         </button>
@@ -440,14 +440,14 @@ export function AdminDashboardClient({
           return (
             <Card
               key={res.id}
-              className={`border-slate-800 bg-slate-900/80 p-5 transition-all ${
-                !isActive ? "opacity-75 bg-slate-950/80 border-slate-850" : ""
+              className={`border border-slate-200/90 bg-white p-5 transition-all shadow-xs hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900/80 ${
+                !isActive ? "opacity-75 bg-slate-50 dark:bg-slate-950/80 dark:border-slate-850" : ""
               }`}
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-base font-bold text-white">
+                    <span className="text-base font-bold text-slate-900 dark:text-white">
                       {res.name}
                     </span>
                     {res.status === ResourceStatus.ACTIVE && (
@@ -472,20 +472,20 @@ export function AdminDashboardClient({
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
-                    <span className="text-emerald-400 font-medium">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
+                    <span className="text-emerald-700 dark:text-emerald-400 font-medium">
                       {res.category.name}
                     </span>
                     <span>•</span>
                     <span className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-slate-500" />
+                      <MapPin className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                       {res.location}
                     </span>
                     {res.capacity && (
                       <>
                         <span>•</span>
                         <span className="flex items-center gap-1">
-                          <Users className="w-3 h-3 text-slate-500" />
+                          <Users className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                           Capacity: {res.capacity}
                         </span>
                       </>
@@ -493,14 +493,14 @@ export function AdminDashboardClient({
                   </div>
 
                   {res.description && (
-                    <p className="text-xs text-slate-400 max-w-2xl line-clamp-1">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 max-w-2xl line-clamp-1">
                       {res.description}
                     </p>
                   )}
                 </div>
 
                 {/* Admin Actions: Edit & Deactivate */}
-                <div className="flex items-center gap-2 shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-800">
+                <div className="flex items-center gap-2 shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
                   <Button
                     variant="outline"
                     size="sm"
@@ -543,16 +543,16 @@ export function AdminDashboardClient({
       {activeTab === "users" && (
         <div className="space-y-4">
           {/* Search & Filter Bar */}
-          <Card className="border-slate-800 bg-slate-900/60 p-4">
+          <Card className="border border-slate-200/90 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900/60">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <input
                   type="text"
                   placeholder="Search personnel by name, email, or department..."
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs dark:bg-slate-950 dark:border-slate-800 dark:text-slate-200 dark:placeholder:text-slate-500"
                 />
               </div>
 
@@ -560,7 +560,7 @@ export function AdminDashboardClient({
                 <select
                   value={userRoleFilter}
                   onChange={(e) => setUserRoleFilter(e.target.value as any)}
-                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs dark:bg-slate-950 dark:border-slate-800 dark:text-slate-300 cursor-pointer"
                 >
                   <option value="ALL">All Roles ({(initialUsers || []).length})</option>
                   <option value="ADMIN">Administrators Only</option>
@@ -570,7 +570,7 @@ export function AdminDashboardClient({
                 <Button
                   onClick={openAddUserModal}
                   size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-500 border-emerald-500/30 text-xs shrink-0"
+                  className="bg-emerald-600 hover:bg-emerald-500 border-emerald-500/30 text-xs text-white shrink-0"
                 >
                   <UserPlus className="w-3.5 h-3.5 mr-1.5" /> New User
                 </Button>
@@ -581,9 +581,9 @@ export function AdminDashboardClient({
           {/* Personnel Table / Card List */}
           <div className="space-y-2.5">
             {filteredUsers.length === 0 ? (
-              <div className="text-center py-12 border border-dashed border-slate-800 rounded-xl bg-slate-900/30 space-y-3">
-                <Users className="w-8 h-8 text-slate-600 mx-auto" />
-                <p className="text-sm text-slate-400">No personnel found matching your filter criteria.</p>
+              <div className="text-center py-12 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/50 dark:bg-slate-900/30 space-y-3">
+                <Users className="w-8 h-8 text-slate-400 dark:text-slate-600 mx-auto" />
+                <p className="text-sm text-slate-500 dark:text-slate-400">No personnel found matching your filter criteria.</p>
                 {userSearch && (
                   <Button
                     variant="outline"
@@ -610,15 +610,15 @@ export function AdminDashboardClient({
                 return (
                   <Card
                     key={u.id}
-                    className="border-slate-800 bg-slate-900/80 p-4 hover:border-slate-700/80 transition-colors"
+                    className="border border-slate-200/90 bg-white p-4 hover:border-slate-300 hover:shadow-xs transition-colors dark:border-slate-800 dark:bg-slate-900/80"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-3.5">
                         <div
                           className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border ${
                             isAdminUser
-                              ? "bg-purple-950/80 border-purple-700 text-purple-300"
-                              : "bg-emerald-950/80 border-emerald-800 text-emerald-300"
+                              ? "bg-purple-100 border-purple-200 text-purple-700 dark:bg-purple-950/80 dark:border-purple-700 dark:text-purple-300"
+                              : "bg-emerald-100 border-emerald-200 text-emerald-700 dark:bg-emerald-950/80 dark:border-emerald-800 dark:text-emerald-300"
                           }`}
                         >
                           {initials}
@@ -626,44 +626,44 @@ export function AdminDashboardClient({
 
                         <div className="space-y-0.5">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-white">
+                            <span className="text-sm font-bold text-slate-900 dark:text-white">
                               {u.name}
                             </span>
                             {isAdminUser ? (
                               <Badge variant="purple" size="sm" className="gap-1 font-semibold">
-                                <ShieldCheck className="w-3 h-3 text-purple-400" /> Admin
+                                <ShieldCheck className="w-3 h-3 text-purple-600 dark:text-purple-400" /> Admin
                               </Badge>
                             ) : (
                               <Badge variant="teal" size="sm" className="gap-1 font-medium">
-                                <Users className="w-3 h-3 text-teal-400" /> Team Member
+                                <Users className="w-3 h-3 text-teal-600 dark:text-teal-400" /> Team Member
                               </Badge>
                             )}
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-                            <span className="flex items-center gap-1 text-slate-300">
-                              <Mail className="w-3 h-3 text-slate-500" />
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300">
+                              <Mail className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                               {u.email}
                             </span>
                             {u.department && (
                               <>
                                 <span>•</span>
-                                <span className="flex items-center gap-1 text-slate-400">
-                                  <Briefcase className="w-3 h-3 text-slate-500" />
+                                <span className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
+                                  <Briefcase className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                                   {u.department}
                                 </span>
                               </>
                             )}
                             <span>•</span>
-                            <span className="text-slate-500">
+                            <span className="text-slate-400 dark:text-slate-500">
                               Joined {new Date(u.createdAt).toLocaleDateString()}
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 self-end sm:self-center text-xs text-slate-400">
-                        <span className="px-2.5 py-1 rounded bg-slate-950 border border-slate-800 text-slate-300 font-mono">
+                      <div className="flex items-center gap-3 self-end sm:self-center text-xs text-slate-600 dark:text-slate-400">
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-300 font-mono">
                           {u._count?.reservations || 0} reservations
                         </span>
                       </div>
@@ -682,7 +682,7 @@ export function AdminDashboardClient({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               {/* Status Filter */}
-              <div className="inline-flex rounded-xl bg-slate-900/80 border border-slate-800 p-1">
+              <div className="inline-flex rounded-xl bg-slate-100 border border-slate-200 p-1 dark:bg-slate-900/80 dark:border-slate-800">
                 {(["ALL", "CONFIRMED", "CANCELLED"] as const).map((st) => (
                   <button
                     key={st}
@@ -690,8 +690,8 @@ export function AdminDashboardClient({
                     onClick={() => setReservationStatusFilter(st)}
                     className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                       reservationStatusFilter === st
-                        ? "bg-purple-600 text-white shadow-sm"
-                        : "text-slate-400 hover:text-white"
+                        ? "bg-purple-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                     }`}
                   >
                     {st === "ALL" ? "All Bookings" : st === "CONFIRMED" ? "Confirmed" : "Cancelled"}
@@ -703,7 +703,7 @@ export function AdminDashboardClient({
               <select
                 value={reservationDeptFilter}
                 onChange={(e) => setReservationDeptFilter(e.target.value)}
-                className="bg-slate-900 border border-slate-800 text-xs rounded-xl px-3 py-2 text-slate-200 outline-none focus:border-purple-500 cursor-pointer"
+                className="bg-white border border-slate-200 text-xs rounded-xl px-3 py-2 text-slate-800 outline-none focus:border-purple-500 shadow-2xs dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 cursor-pointer"
               >
                 <option value="ALL">All Departments</option>
                 {allDepartments.map((dept) => (
@@ -714,20 +714,20 @@ export function AdminDashboardClient({
               </select>
 
               {/* Date Filter */}
-              <div className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 shadow-sm">
-                <CalendarDays className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+              <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 shadow-2xs dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                <CalendarDays className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
                 <input
                   type="date"
                   value={reservationDateFilter}
                   onChange={(e) => setReservationDateFilter(e.target.value)}
-                  className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer [color-scheme:dark]"
+                  className="bg-transparent text-xs text-slate-800 dark:text-slate-200 outline-none cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
                   title="Filter company reservations by date"
                 />
                 {reservationDateFilter && (
                   <button
                     type="button"
                     onClick={() => setReservationDateFilter("")}
-                    className="text-[11px] font-bold text-rose-400 hover:text-rose-300 ml-1 px-1 py-0.5 rounded transition-colors"
+                    className="text-[11px] font-bold text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 ml-1 px-1 py-0.5 rounded transition-colors cursor-pointer"
                     title="Clear date filter"
                   >
                     ✕
@@ -738,7 +738,7 @@ export function AdminDashboardClient({
 
             {/* Search */}
             <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
               <Input
                 placeholder="Search employee, facility, title..."
                 value={reservationSearch}
@@ -751,9 +751,9 @@ export function AdminDashboardClient({
           {/* Reservations List */}
           <div className="space-y-3">
             {filteredReservations.length === 0 ? (
-              <div className="text-center py-12 border border-dashed border-slate-800 rounded-xl bg-slate-900/30 space-y-3">
-                <CalendarDays className="w-8 h-8 text-slate-600 mx-auto" />
-                <p className="text-sm text-slate-400">
+              <div className="text-center py-12 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/50 dark:bg-slate-900/30 space-y-3">
+                <CalendarDays className="w-8 h-8 text-slate-400 dark:text-slate-600 mx-auto" />
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   {reservationDateFilter
                     ? `No company reservations found for date ${reservationDateFilter}.`
                     : "No company reservations found matching filter criteria."}
@@ -785,12 +785,12 @@ export function AdminDashboardClient({
                 return (
                   <Card
                     key={res.id}
-                    className="border-slate-800 bg-slate-900/80 p-4 hover:border-slate-700/80 transition-colors"
+                    className="border border-slate-200/90 bg-white p-4 hover:border-slate-300 hover:shadow-xs transition-colors dark:border-slate-800 dark:bg-slate-900/80"
                   >
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold text-sm text-white">
+                          <span className="font-bold text-sm text-slate-900 dark:text-white">
                             {res.title}
                           </span>
                           <Badge
@@ -806,16 +806,16 @@ export function AdminDashboardClient({
                           )}
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
-                          <span className="flex items-center gap-1.5 text-purple-300 font-medium">
-                            <Users className="w-3.5 h-3.5 text-purple-400" />
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                          <span className="flex items-center gap-1.5 text-purple-700 dark:text-purple-300 font-medium">
+                            <Users className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                             <span>{res.user?.name} ({res.user?.department || "General"})</span>
                           </span>
-                          <span className="flex items-center gap-1.5 text-teal-300 font-medium">
-                            <Building2 className="w-3.5 h-3.5 text-teal-400" />
+                          <span className="flex items-center gap-1.5 text-teal-700 dark:text-teal-300 font-medium">
+                            <Building2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                             <span>{res.resource?.name} ({res.resource?.location})</span>
                           </span>
-                          <span className="flex items-center gap-1.5 font-mono text-slate-300">
+                          <span className="flex items-center gap-1.5 font-mono text-slate-700 dark:text-slate-300">
                             <Clock className="w-3.5 h-3.5 text-slate-400" />
                             <span>
                               {formatDate(res.startTime)} • {formatTime(res.startTime)} – {formatTime(res.endTime)}
@@ -873,7 +873,7 @@ export function AdminDashboardClient({
             )}
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Resource Name *
               </label>
               <Input
@@ -887,13 +887,13 @@ export function AdminDashboardClient({
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Category *
                 </label>
                 <select
                   value={formCategoryId}
                   onChange={(e) => setFormCategoryId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs dark:bg-slate-950 dark:border-slate-700 dark:text-slate-200 cursor-pointer"
                   required
                 >
                   {categories.map((c) => (
@@ -905,13 +905,13 @@ export function AdminDashboardClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Initial Status *
                 </label>
                 <select
                   value={formStatus}
                   onChange={(e) => setFormStatus(e.target.value as ResourceStatus)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs dark:bg-slate-950 dark:border-slate-700 dark:text-slate-200 cursor-pointer"
                 >
                   <option value={ResourceStatus.ACTIVE}>Active</option>
                   <option value={ResourceStatus.MAINTENANCE}>Maintenance</option>
@@ -922,7 +922,7 @@ export function AdminDashboardClient({
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Physical Location *
                 </label>
                 <Input
@@ -934,7 +934,7 @@ export function AdminDashboardClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Capacity (Optional)
                 </label>
                 <Input
@@ -948,11 +948,11 @@ export function AdminDashboardClient({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Description
               </label>
               <textarea
-                className="w-full h-16 rounded-lg border border-slate-700/80 bg-slate-950 px-3.5 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500"
+                className="w-full h-16 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 shadow-2xs dark:border-slate-700/80 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
                 placeholder="Brief description of the room or equipment..."
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
@@ -960,18 +960,18 @@ export function AdminDashboardClient({
             </div>
 
             {/* Turnaround Buffer Setting */}
-            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3.5 space-y-2.5">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-2.5 dark:border-slate-800 dark:bg-slate-950/80">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-2.5">
                   <span className="text-lg">🧹</span>
                   <div>
                     <label
                       htmlFor="turnaround-toggle"
-                      className="text-xs font-semibold text-slate-200 block cursor-pointer"
+                      className="text-xs font-semibold text-slate-800 dark:text-slate-200 block cursor-pointer"
                     >
                       Require Turnaround Buffer (Cleaning & Reset)
                     </label>
-                    <span className="text-[11px] text-slate-400 block leading-relaxed">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block leading-relaxed">
                       Enforce automated interval buffer between consecutive bookings for cleaning, inspection, or recharge.
                     </span>
                   </div>
@@ -981,19 +981,19 @@ export function AdminDashboardClient({
                   type="checkbox"
                   checked={requireBuffer}
                   onChange={(e) => setRequireBuffer(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-teal-600 focus:ring-teal-500 cursor-pointer mt-0.5"
+                  className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer mt-0.5 dark:border-slate-700 dark:bg-slate-900"
                 />
               </div>
 
               {requireBuffer && (
-                <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-3">
-                  <span className="text-xs text-slate-300 font-medium">
+                <div className="pt-2.5 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-3">
+                  <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">
                     Buffer Duration:
                   </span>
                   <select
                     value={bufferMinutes}
                     onChange={(e) => setBufferMinutes(Number(e.target.value))}
-                    className="bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    className="bg-white border border-slate-300 rounded-lg text-xs text-slate-800 px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 cursor-pointer"
                   >
                     <option value={10}>10 minutes (Quick Wipe & Air)</option>
                     <option value={15}>15 minutes (Standard Room Reset / Sanitization)</option>
@@ -1006,18 +1006,18 @@ export function AdminDashboardClient({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Attributes & Specs (JSON)
               </label>
               <textarea
-                className="w-full h-20 rounded-lg border border-slate-700/80 bg-slate-950 px-3.5 py-2 text-xs font-mono text-emerald-300 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500"
+                className="w-full h-20 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-mono text-emerald-700 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 shadow-2xs dark:border-slate-700/80 dark:bg-slate-950 dark:text-emerald-300 dark:placeholder:text-slate-500"
                 placeholder='{"screen": "4K Display", "whiteboard": true}'
                 value={formAttributes}
                 onChange={(e) => setFormAttributes(e.target.value)}
               />
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
               <Button
                 type="button"
                 variant="secondary"
@@ -1026,7 +1026,7 @@ export function AdminDashboardClient({
               >
                 Cancel
               </Button>
-              <Button type="submit" isLoading={isSaving}>
+              <Button type="submit" isLoading={isSaving} className="bg-purple-600 hover:bg-purple-500 text-white">
                 {editingId ? "Save Changes" : "Create Resource"}
               </Button>
             </div>
@@ -1045,21 +1045,21 @@ export function AdminDashboardClient({
         >
           <form onSubmit={handleCreateUser} className="space-y-4">
             {userError && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-950/60 border border-rose-800/80 text-rose-300 text-sm">
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 dark:bg-rose-950/60 dark:border-rose-800/80 dark:text-rose-300 text-sm">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span>{userError}</span>
               </div>
             )}
 
             {userSuccess && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 text-sm">
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-emerald-950/60 dark:border-emerald-800/80 dark:text-emerald-300 text-sm">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span>{userSuccess}</span>
               </div>
             )}
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Full Name *
               </label>
               <Input
@@ -1072,7 +1072,7 @@ export function AdminDashboardClient({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Corporate Email Address *
               </label>
               <Input
@@ -1086,13 +1086,13 @@ export function AdminDashboardClient({
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Role / Permissions (RBAC) *
                 </label>
                 <select
                   value={userRole}
                   onChange={(e) => setUserRole(e.target.value as Role)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs dark:bg-slate-950 dark:border-slate-700 dark:text-slate-200 cursor-pointer"
                 >
                   <option value={Role.USER}>Standard Team Member</option>
                   <option value={Role.ADMIN}>System Administrator</option>
@@ -1100,7 +1100,7 @@ export function AdminDashboardClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Department
                 </label>
                 <select
@@ -1111,7 +1111,7 @@ export function AdminDashboardClient({
                       setCustomDepartment("");
                     }
                   }}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs dark:bg-slate-950 dark:border-slate-700 dark:text-slate-200 cursor-pointer"
                 >
                   <option value="Engineering">Engineering</option>
                   <option value="Product & Design">Product & Design</option>
@@ -1125,10 +1125,10 @@ export function AdminDashboardClient({
             </div>
 
             {userDepartment === "OTHER" && (
-              <div className="space-y-1.5 p-3 rounded-lg bg-slate-950/70 border border-emerald-500/40">
-                <label className="text-xs font-semibold text-emerald-400 flex items-center justify-between">
+              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-emerald-300 dark:bg-slate-950/70 dark:border-emerald-500/40">
+                <label className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center justify-between">
                   <span>Custom Department Name *</span>
-                  <span className="text-[10px] text-slate-400 font-normal">e.g. Legal, QA Testing, Customer Success</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-normal">e.g. Legal, QA Testing, Customer Success</span>
                 </label>
                 <Input
                   type="text"
@@ -1143,7 +1143,7 @@ export function AdminDashboardClient({
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-300">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Temporary Access Password *
                 </label>
                 <button
@@ -1151,13 +1151,13 @@ export function AdminDashboardClient({
                   onClick={() =>
                     setUserPassword("prime" + Math.floor(1000 + Math.random() * 9000))
                   }
-                  className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                  className="text-[11px] text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 flex items-center gap-1 cursor-pointer font-medium"
                 >
                   <RefreshCw className="w-3 h-3" /> Auto-Generate
                 </button>
               </div>
               <div className="relative">
-                <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <Input
                   type="text"
                   placeholder="At least 6 characters"
@@ -1173,7 +1173,7 @@ export function AdminDashboardClient({
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
               <Button
                 type="button"
                 variant="secondary"
