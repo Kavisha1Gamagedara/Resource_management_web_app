@@ -41,6 +41,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { ResourceStatus, Role } from "@prisma/client";
+import { format } from "date-fns";
 import { AdminCreateReservationModal } from "./AdminCreateReservationModal";
 import { cancelReservation } from "@/lib/actions/reservations";
 import { formatDate, formatTime } from "@/lib/utils";
@@ -119,6 +120,7 @@ export function AdminDashboardClient({
   const [reservationSearch, setReservationSearch] = React.useState("");
   const [reservationStatusFilter, setReservationStatusFilter] = React.useState<"ALL" | "CONFIRMED" | "CANCELLED">("ALL");
   const [reservationDeptFilter, setReservationDeptFilter] = React.useState<string>("ALL");
+  const [reservationDateFilter, setReservationDateFilter] = React.useState<string>("");
 
   // Distinct departments across all reservations
   const allDepartments = React.useMemo(() => {
@@ -141,6 +143,19 @@ export function AdminDashboardClient({
       if (reservationDeptFilter !== "ALL" && r.user?.department !== reservationDeptFilter) {
         return false;
       }
+      if (reservationDateFilter) {
+        const startDayStr = format(new Date(r.startTime), "yyyy-MM-dd");
+        const endDayStr = format(new Date(r.endTime), "yyyy-MM-dd");
+        if (startDayStr !== reservationDateFilter && endDayStr !== reservationDateFilter) {
+          const filterStart = new Date(reservationDateFilter + "T00:00:00").getTime();
+          const filterEnd = new Date(reservationDateFilter + "T23:59:59.999").getTime();
+          const s = new Date(r.startTime).getTime();
+          const e = new Date(r.endTime).getTime();
+          if (s > filterEnd || e < filterStart) {
+            return false;
+          }
+        }
+      }
       if (!reservationSearch.trim()) return true;
 
       const q = reservationSearch.toLowerCase();
@@ -153,7 +168,7 @@ export function AdminDashboardClient({
 
       return titleMatch || userNameMatch || userEmailMatch || resourceNameMatch || locationMatch || deptMatch;
     });
-  }, [initialReservations, reservationStatusFilter, reservationDeptFilter, reservationSearch]);
+  }, [initialReservations, reservationStatusFilter, reservationDeptFilter, reservationDateFilter, reservationSearch]);
 
   const [isUserModalOpen, setIsUserModalOpen] = React.useState(false);
   const [userSearch, setUserSearch] = React.useState("");
@@ -688,7 +703,7 @@ export function AdminDashboardClient({
               <select
                 value={reservationDeptFilter}
                 onChange={(e) => setReservationDeptFilter(e.target.value)}
-                className="bg-slate-900 border border-slate-800 text-xs rounded-xl px-3 py-2 text-slate-200 outline-none focus:border-purple-500"
+                className="bg-slate-900 border border-slate-800 text-xs rounded-xl px-3 py-2 text-slate-200 outline-none focus:border-purple-500 cursor-pointer"
               >
                 <option value="ALL">All Departments</option>
                 {allDepartments.map((dept) => (
@@ -697,6 +712,28 @@ export function AdminDashboardClient({
                   </option>
                 ))}
               </select>
+
+              {/* Date Filter */}
+              <div className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 shadow-sm">
+                <CalendarDays className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <input
+                  type="date"
+                  value={reservationDateFilter}
+                  onChange={(e) => setReservationDateFilter(e.target.value)}
+                  className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer [color-scheme:dark]"
+                  title="Filter company reservations by date"
+                />
+                {reservationDateFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setReservationDateFilter("")}
+                    className="text-[11px] font-bold text-rose-400 hover:text-rose-300 ml-1 px-1 py-0.5 rounded transition-colors"
+                    title="Clear date filter"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Search */}
@@ -716,14 +753,30 @@ export function AdminDashboardClient({
             {filteredReservations.length === 0 ? (
               <div className="text-center py-12 border border-dashed border-slate-800 rounded-xl bg-slate-900/30 space-y-3">
                 <CalendarDays className="w-8 h-8 text-slate-600 mx-auto" />
-                <p className="text-sm text-slate-400">No company reservations found matching filter criteria.</p>
-                <Button
-                  onClick={() => setIsAdminReservationModalOpen(true)}
-                  size="sm"
-                  className="bg-purple-600 hover:bg-purple-500 text-white text-xs"
-                >
-                  <UserPlus className="w-4 h-4 mr-1.5" /> Book on Behalf of User
-                </Button>
+                <p className="text-sm text-slate-400">
+                  {reservationDateFilter
+                    ? `No company reservations found for date ${reservationDateFilter}.`
+                    : "No company reservations found matching filter criteria."}
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  {reservationDateFilter && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReservationDateFilter("")}
+                      className="text-xs"
+                    >
+                      Clear Date Filter
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => setIsAdminReservationModalOpen(true)}
+                    size="sm"
+                    className="bg-purple-600 hover:bg-purple-500 text-white text-xs"
+                  >
+                    <UserPlus className="w-4 h-4 mr-1.5" /> Book on Behalf of User
+                  </Button>
+                </div>
               </div>
             ) : (
               filteredReservations.map((res: any) => {

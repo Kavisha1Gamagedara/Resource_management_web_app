@@ -145,6 +145,7 @@ export function TeamScheduleClient({
             <Input
               type="date"
               value={selectedDate}
+              min={format(new Date(), "yyyy-MM-dd")}
               onChange={(e) => setSelectedDate(e.target.value)}
               className="text-xs h-9 bg-slate-950"
             />

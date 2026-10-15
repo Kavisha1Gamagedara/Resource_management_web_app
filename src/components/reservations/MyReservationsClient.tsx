@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import {
   Calendar,
   Clock,
@@ -21,18 +22,20 @@ import {
   Users,
   Filter,
   User,
+  RotateCcw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { formatDateTime, formatTimeRange, formatDate, formatTime } from "@/lib/utils";
 import { EditReservationModal } from "./EditReservationModal";
 import { AdminCreateReservationModal } from "@/components/admin/AdminCreateReservationModal";
+import { CancelReservationModal } from "./CancelReservationModal";
 import {
   cancelReservation,
   checkInReservation,
   autoReleaseGhostBookings,
   simulateGhostRelease,
 } from "@/lib/actions/reservations";
-import { parseCheckInStatus, getCheckInEligibility } from "@/lib/ghost-booking";
+import { parseCheckInStatus, getCheckInEligibility, parseCancellationReason } from "@/lib/ghost-booking";
 import { AddToCalendarButton } from "./AddToCalendarButton";
 
 interface ReservationItem {
@@ -69,6 +72,7 @@ interface MyReservationsClientProps {
   initialReservations: ReservationItem[];
   userName: string;
   isAdmin?: boolean;
+  currentUserId?: string;
   companyUsers?: any[];
   resources?: any[];
 }
@@ -77,6 +81,7 @@ export function MyReservationsClient({
   initialReservations,
   userName,
   isAdmin = false,
+  currentUserId,
   companyUsers = [],
   resources = [],
 }: MyReservationsClientProps) {
@@ -86,9 +91,9 @@ export function MyReservationsClient({
   const [search, setSearch] = useState("");
   const [selectedUserFilter, setSelectedUserFilter] = useState<string>("ALL");
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>("ALL");
+  const [selectedDateFilter, setSelectedDateFilter] = useState<string>("");
   const [isAdminBookModalOpen, setIsAdminBookModalOpen] = useState(false);
 
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
   const [simulatingId, setSimulatingId] = useState<string | null>(null);
   const [isSweeping, setIsSweeping] = useState(false);
@@ -98,7 +103,23 @@ export function MyReservationsClient({
   const [reservationToEdit, setReservationToEdit] = useState<ReservationItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
+  // Cancel Modal State (with mandatory reason for admin actions)
+  const [reservationToCancel, setReservationToCancel] = useState<ReservationItem | null>(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+
   const now = new Date();
+  const todayStr = format(now, "yyyy-MM-dd");
+
+  const handleTabChange = (tab: "UPCOMING" | "PAST" | "CANCELLED") => {
+    setActiveTab(tab);
+    if (selectedDateFilter) {
+      if (tab === "UPCOMING" && selectedDateFilter < todayStr) {
+        setSelectedDateFilter("");
+      } else if (tab === "PAST" && selectedDateFilter > todayStr) {
+        setSelectedDateFilter("");
+      }
+    }
+  };
 
   // Distinct departments across all bookings and company users
   const departments = useMemo(() => {
@@ -112,7 +133,7 @@ export function MyReservationsClient({
     return Array.from(set).sort();
   }, [reservations, companyUsers]);
 
-  // Filter reservations based on active tab, search, user, and department
+  // Filter reservations based on active tab, search, user, department, and date
   const filteredReservations = reservations.filter((item) => {
     const isCancelled = item.status === "CANCELLED";
     const itemEnd = new Date(item.endTime);
@@ -125,6 +146,21 @@ export function MyReservationsClient({
     else if (activeTab === "CANCELLED") tabMatch = isCancelled;
 
     if (!tabMatch) return false;
+
+    // Filter by specific date
+    if (selectedDateFilter) {
+      const startDayStr = format(new Date(item.startTime), "yyyy-MM-dd");
+      const endDayStr = format(new Date(item.endTime), "yyyy-MM-dd");
+      if (startDayStr !== selectedDateFilter && endDayStr !== selectedDateFilter) {
+        const filterStart = new Date(selectedDateFilter + "T00:00:00").getTime();
+        const filterEnd = new Date(selectedDateFilter + "T23:59:59.999").getTime();
+        const s = new Date(item.startTime).getTime();
+        const e = new Date(item.endTime).getTime();
+        if (s > filterEnd || e < filterStart) {
+          return false;
+        }
+      }
+    }
 
     // Admin employee filter
     if (
@@ -165,43 +201,7 @@ export function MyReservationsClient({
     );
   });
 
-  // Handle Cancel Booking
-  const handleCancel = async (item: ReservationItem) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to cancel your reservation for "${item.title}"?\nThis slot will immediately become available for others to book.`
-    );
-    if (!confirmed) return;
 
-    setCancellingId(item.id);
-    setStatusMessage(null);
-
-    try {
-      const res = await cancelReservation(item.id);
-      if (res.success) {
-        setStatusMessage({
-          type: "success",
-          text: `Reservation for "${item.title}" successfully cancelled. Time slot freed.`,
-        });
-        // Optimistically update list
-        setReservations((prev) =>
-          prev.map((r) => (r.id === item.id ? { ...r, status: "CANCELLED" } : r))
-        );
-        router.refresh();
-      } else {
-        setStatusMessage({
-          type: "error",
-          text: res.error || "Failed to cancel reservation.",
-        });
-      }
-    } catch (err: any) {
-      setStatusMessage({
-        type: "error",
-        text: err?.message || "An unexpected error occurred.",
-      });
-    } finally {
-      setCancellingId(null);
-    }
-  };
 
   // Handle Check In (Ghost Booking Prevention Feature)
   const handleCheckIn = async (item: ReservationItem) => {
@@ -328,6 +328,22 @@ export function MyReservationsClient({
     router.refresh();
   };
 
+  // Handle successful cancellation from modal
+  const handleCancelSuccess = (cancelledReservation: any) => {
+    setReservations((prev) =>
+      prev.map((r) =>
+        r.id === cancelledReservation.id
+          ? { ...r, ...cancelledReservation, status: "CANCELLED" }
+          : r
+      )
+    );
+    setStatusMessage({
+      type: "success",
+      text: `Reservation for "${cancelledReservation.title}" has been cancelled.`,
+    });
+    router.refresh();
+  };
+
   const upcomingCount = reservations.filter(
     (r) => r.status !== "CANCELLED" && new Date(r.endTime) >= now
   ).length;
@@ -448,7 +464,7 @@ export function MyReservationsClient({
         {/* Tabs */}
         <div className="inline-flex rounded-2xl bg-zinc-100 p-1 dark:bg-zinc-800/60 self-start">
           <button
-            onClick={() => setActiveTab("UPCOMING")}
+            onClick={() => handleTabChange("UPCOMING")}
             className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
               activeTab === "UPCOMING"
                 ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100"
@@ -468,7 +484,7 @@ export function MyReservationsClient({
           </button>
 
           <button
-            onClick={() => setActiveTab("PAST")}
+            onClick={() => handleTabChange("PAST")}
             className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
               activeTab === "PAST"
                 ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100"
@@ -488,7 +504,7 @@ export function MyReservationsClient({
           </button>
 
           <button
-            onClick={() => setActiveTab("CANCELLED")}
+            onClick={() => handleTabChange("CANCELLED")}
             className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
               activeTab === "CANCELLED"
                 ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100"
@@ -508,15 +524,45 @@ export function MyReservationsClient({
           </button>
         </div>
 
-        {/* Admin Filters & Search */}
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        {/* Filters & Search */}
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          {/* Date Filter */}
+          <div className="flex items-center gap-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1.5 shadow-sm">
+            <Calendar className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+            <input
+              type="date"
+              value={selectedDateFilter}
+              min={activeTab === "UPCOMING" ? todayStr : undefined}
+              max={activeTab === "PAST" ? todayStr : undefined}
+              onChange={(e) => setSelectedDateFilter(e.target.value)}
+              className="bg-transparent text-xs text-zinc-800 dark:text-zinc-200 outline-none cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
+              title={
+                activeTab === "UPCOMING"
+                  ? "Filter upcoming reservations by date (past dates disabled)"
+                  : activeTab === "PAST"
+                  ? "Filter past history by date"
+                  : "Filter reservations by date"
+              }
+            />
+            {selectedDateFilter && (
+              <button
+                type="button"
+                onClick={() => setSelectedDateFilter("")}
+                className="text-[11px] font-bold text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 ml-1 px-1 py-0.5 rounded transition-colors"
+                title="Clear date filter"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
           {isAdmin && (
             <>
               {/* Department Filter */}
               <select
                 value={selectedDeptFilter}
                 onChange={(e) => setSelectedDeptFilter(e.target.value)}
-                className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-800 dark:text-zinc-200 outline-none focus:border-purple-500 shadow-sm"
+                className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-800 dark:text-zinc-200 outline-none focus:border-purple-500 shadow-sm cursor-pointer"
               >
                 <option value="ALL">All Departments</option>
                 {departments.map((dept) => (
@@ -530,7 +576,7 @@ export function MyReservationsClient({
               <select
                 value={selectedUserFilter}
                 onChange={(e) => setSelectedUserFilter(e.target.value)}
-                className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-800 dark:text-zinc-200 outline-none focus:border-purple-500 shadow-sm max-w-[200px]"
+                className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-800 dark:text-zinc-200 outline-none focus:border-purple-500 shadow-sm max-w-[200px] cursor-pointer"
               >
                 <option value="ALL">All Employees ({companyUsers.length || "All"})</option>
                 {companyUsers.map((u: any) => (
@@ -564,12 +610,24 @@ export function MyReservationsClient({
             No {activeTab.toLowerCase()} bookings found
           </h3>
           <p className="mt-1 text-xs text-zinc-500">
-            {isAdmin
+            {selectedDateFilter
+              ? `No ${activeTab.toLowerCase()} reservations found on ${selectedDateFilter}.`
+              : isAdmin
               ? `No ${activeTab.toLowerCase()} company reservations match the selected filters.`
               : activeTab === "UPCOMING"
               ? "You do not have any upcoming reservations scheduled."
               : `No ${activeTab.toLowerCase()} reservations recorded.`}
           </p>
+          {selectedDateFilter && (
+            <button
+              type="button"
+              onClick={() => setSelectedDateFilter("")}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 transition-colors cursor-pointer"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Clear Date Filter</span>
+            </button>
+          )}
           {isAdmin ? (
             <button
               type="button"
@@ -595,6 +653,7 @@ export function MyReservationsClient({
             const isCancelled = item.status === "CANCELLED";
             const isPast = new Date(item.endTime).getTime() <= Date.now();
             const checkInInfo = parseCheckInStatus(item.notes || item.adminNotes);
+            const cancellationInfo = parseCancellationReason(item.notes || item.adminNotes);
             const eligibility = getCheckInEligibility(item.startTime, item.endTime);
 
             return (
@@ -619,10 +678,14 @@ export function MyReservationsClient({
                         </Badge>
                       )}
 
-                      {/* Ghost Booking Badges */}
+                      {/* Ghost Booking Badges & Cancellation Badges */}
                       {isCancelled && checkInInfo.isAutoReleased ? (
                         <Badge variant="danger" size="sm">
                           👻 Auto-Released (No-Show)
+                        </Badge>
+                      ) : isCancelled && cancellationInfo.isCancelledByAdmin ? (
+                        <Badge variant="danger" size="sm">
+                          🛡️ Cancelled by Admin
                         </Badge>
                       ) : checkInInfo.isCheckedIn ? (
                         <Badge variant="success" size="sm">
@@ -654,6 +717,8 @@ export function MyReservationsClient({
                           ? "Declined"
                           : isCancelled && checkInInfo.isAutoReleased
                           ? "Auto-Released"
+                          : isCancelled && cancellationInfo.isCancelledByAdmin
+                          ? "Admin Cancelled"
                           : isCancelled
                           ? "Cancelled"
                           : isPast
@@ -719,6 +784,29 @@ export function MyReservationsClient({
                       &quot;{checkInInfo.cleanNotes}&quot;
                     </p>
                   )}
+
+                  {/* Admin Cancellation Reason Notice Box for Affected Users */}
+                  {isCancelled && cancellationInfo.isCancelledByAdmin && cancellationInfo.reason ? (
+                    <div className="mt-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 p-3.5 text-xs text-rose-900 dark:bg-rose-950/40 dark:border-rose-800/80 dark:text-rose-200">
+                      <div className="flex items-center gap-2 font-bold text-rose-800 dark:text-rose-300">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                        <span>Cancelled by Administrator {cancellationInfo.cancelledBy ? `(${cancellationInfo.cancelledBy})` : ""}</span>
+                      </div>
+                      <div className="mt-2 pl-6 space-y-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block">
+                          Reason for Cancellation:
+                        </span>
+                        <p className="text-xs font-medium text-rose-950 dark:text-rose-100 italic bg-white/80 dark:bg-zinc-900/80 p-2.5 rounded-xl border border-rose-200/80 dark:border-rose-900/60 shadow-xs">
+                          &ldquo;{cancellationInfo.reason}&rdquo;
+                        </p>
+                      </div>
+                    </div>
+                  ) : isCancelled && cancellationInfo.reason ? (
+                    <div className="mt-3 rounded-2xl bg-zinc-100 border border-zinc-200 p-3 text-xs text-zinc-700 dark:bg-zinc-800/60 dark:border-zinc-700 dark:text-zinc-300">
+                      <span className="font-semibold block text-zinc-800 dark:text-zinc-200">Cancellation Reason:</span>
+                      <p className="mt-1 italic bg-white/60 dark:bg-zinc-900/50 p-2 rounded-lg">&ldquo;{cancellationInfo.reason}&rdquo;</p>
+                    </div>
+                  ) : null}
 
                   {/* Ghost Booking Prevention Interactive Card Panel */}
                   {isCancelled && checkInInfo.isAutoReleased ? (
@@ -829,15 +917,13 @@ export function MyReservationsClient({
                       </button>
 
                       <button
-                        onClick={() => handleCancel(item)}
-                        disabled={cancellingId === item.id}
+                        onClick={() => {
+                          setReservationToCancel(item);
+                          setCancelModalOpen(true);
+                        }}
                         className="inline-flex items-center gap-1 rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 dark:bg-rose-950/60 dark:text-rose-300 transition-colors cursor-pointer"
                       >
-                        {cancellingId === item.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <XCircle className="h-3.5 w-3.5" />
-                        )}
+                        <XCircle className="h-3.5 w-3.5" />
                         <span>Cancel Booking</span>
                       </button>
                     </div>
@@ -861,6 +947,19 @@ export function MyReservationsClient({
         onClose={() => setModalOpen(false)}
         reservation={reservationToEdit}
         onSuccess={handleEditSuccess}
+      />
+
+      {/* Cancel Reservation Modal */}
+      <CancelReservationModal
+        isOpen={cancelModalOpen}
+        onClose={() => {
+          setCancelModalOpen(false);
+          setReservationToCancel(null);
+        }}
+        reservation={reservationToCancel}
+        isAdmin={isAdmin}
+        currentUserId={currentUserId}
+        onSuccess={handleCancelSuccess}
       />
 
       {/* Admin Create Reservation Modal */}

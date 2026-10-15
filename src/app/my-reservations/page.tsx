@@ -43,6 +43,7 @@ export default async function MyReservationsPage() {
       initialReservations={reservations as any}
       userName={session.user.name || "Team Member"}
       isAdmin={isAdmin}
+      currentUserId={session.user.id}
       companyUsers={companyUsers as any}
       resources={resources as any}
     />

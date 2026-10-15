@@ -198,15 +198,17 @@ export async function updateReservation(id: string, input: ReservationInput) {
 }
 
 /**
- * Story 4: Cancel reservation to immediately free up the slot
+ * Story 4: Cancel reservation to immediately free up the slot.
+ * If cancelled by an administrator for a team member, a justification reason is required and notified to the user.
  */
-export async function cancelReservation(id: string) {
+export async function cancelReservation(id: string, reason?: string) {
   try {
     const user = await requireAuth();
     if (!id) throw new Error("Reservation ID is required.");
 
     const existingReservation = await prisma.reservation.findUnique({
       where: { id },
+      include: { resource: true, user: true },
     });
 
     if (!existingReservation) {
@@ -218,10 +220,34 @@ export async function cancelReservation(id: string) {
       throw new Error("You do not have permission to cancel this reservation.");
     }
 
+    // Guard: Past reservations cannot be cancelled
+    if (new Date(existingReservation.endTime).getTime() <= Date.now()) {
+      throw new Error("Past reservations cannot be cancelled.");
+    }
+
+    const isAdminCancellingOther = user.role === "ADMIN" && existingReservation.userId !== user.id;
+
+    if (isAdminCancellingOther && (!reason || !reason.trim())) {
+      throw new Error("Please provide a reason when cancelling a user's reservation.");
+    }
+
+    const existingNotes = existingReservation.notes ? `${existingReservation.notes} ` : "";
+    let updatedNotes = existingReservation.notes;
+
+    if (isAdminCancellingOther) {
+      const adminName = user.name || "Administrator";
+      updatedNotes = `${existingNotes}[CANCELLED_BY_ADMIN:${adminName}] [REASON:${reason!.trim()}]`.trim();
+    } else if (reason?.trim()) {
+      updatedNotes = `${existingNotes}[CANCEL_REASON:${reason.trim()}]`.trim();
+    }
+
     const cancelled = await prisma.reservation.update({
       where: { id },
-      data: { status: ReservationStatus.CANCELLED },
-      include: { resource: true },
+      data: {
+        status: ReservationStatus.CANCELLED,
+        notes: updatedNotes,
+      },
+      include: { resource: true, user: true },
     });
 
     revalidatePath("/");
