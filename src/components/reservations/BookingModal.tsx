@@ -52,6 +52,7 @@ export function BookingModal({
   const [endTimeStr, setEndTimeStr] = useState("11:00");
   const [notes, setNotes] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [autoRelease, setAutoRelease] = useState(true);
 
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const [smartSuggestions, setSmartSuggestions] = useState<{
@@ -83,6 +84,7 @@ export function BookingModal({
     startTime: Date;
     endTime: Date;
     notes?: string | null;
+    autoRelease?: boolean;
   } | null>(null);
 
   // Initialize dates
@@ -108,6 +110,7 @@ export function BookingModal({
     setTitle("");
     setNotes("");
     setIsPrivate(false);
+    setAutoRelease(true);
     setConflictWarning(null);
     setSmartSuggestions(null);
     setSubmitError(null);
@@ -213,6 +216,7 @@ export function BookingModal({
         startTime: start,
         endTime: end,
         isPrivate,
+        autoRelease,
       });
 
       setIsSubmitting(false);
@@ -227,6 +231,7 @@ export function BookingModal({
           startTime: start,
           endTime: end,
           notes: notes.trim() || null,
+          autoRelease,
         });
       } else {
         setSubmitError(result.error || "Reservation failed.");
@@ -313,6 +318,15 @@ export function BookingModal({
                   RFC 5545 & Google Cal
                 </span>
               </div>
+
+              {confirmedBooking.autoRelease && (
+                <div className="flex items-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
+                  <span>👻</span>
+                  <span>
+                    <strong>Ghost Booking Guard Active:</strong> Remember to click <em>[Check In]</em> within 15 minutes of start time on your reservations page to retain the room.
+                  </span>
+                </div>
+              )}
 
               <AddToCalendarActionGroup
                 event={{
@@ -533,6 +547,30 @@ export function BookingModal({
                 />
                 <label htmlFor="isPrivate" className="text-zinc-700 dark:text-zinc-300 cursor-pointer">
                   Mark as Private (Masks details from other team members)
+                </label>
+              </div>
+
+              {/* Ghost Booking Auto-Release Guard Toggle */}
+              <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 dark:bg-amber-950/20 dark:border-amber-900/40">
+                <input
+                  type="checkbox"
+                  id="autoRelease"
+                  checked={autoRelease}
+                  onChange={(e) => setAutoRelease(e.target.checked)}
+                  className="mt-0.5 rounded border-zinc-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
+                />
+                <label htmlFor="autoRelease" className="text-zinc-700 dark:text-zinc-300 cursor-pointer">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs">
+                      Auto-release slot if not checked in within 15 minutes of start time
+                    </span>
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
+                      Anti-Ghosting
+                    </span>
+                  </div>
+                  <span className="block text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+                    Prevents empty conference rooms. If nobody arrives and checks in via the UI within 15 minutes of start time, the slot is automatically freed for your teammates.
+                  </span>
                 </label>
               </div>
 

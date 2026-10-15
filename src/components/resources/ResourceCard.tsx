@@ -1,117 +1,87 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/Badge";
 import {
   MapPin,
   Users,
-  Calendar,
-  CheckCircle,
-  AlertTriangle,
-  Ban,
-  Tag,
   ArrowRight,
+  Layers,
+  Sparkles,
 } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
-import { ResourceStatus } from "@/types";
 
 interface ResourceCardProps {
   resource: {
     id: string;
     name: string;
     description?: string | null;
-    location: string;
+    location?: string;
     capacity?: number | null;
-    status: ResourceStatus;
+    status?: string;
     category?: {
       name: string;
-      slug: string;
+      slug?: string;
     } | null;
-    attributes?: any;
-    _count?: {
-      reservations: number;
-    };
   };
 }
 
 export function ResourceCard({ resource }: ResourceCardProps) {
-  const statusConfig = {
-    ACTIVE: {
-      label: "Available",
-      variant: "success" as const,
-      icon: CheckCircle,
-    },
-    MAINTENANCE: {
-      label: "Maintenance",
-      variant: "warning" as const,
-      icon: AlertTriangle,
-    },
-    INACTIVE: {
-      label: "Inactive",
-      variant: "neutral" as const,
-      icon: Ban,
-    },
-  }[resource.status];
-
-  const StatusIcon = statusConfig.icon;
+  const isAvailable = resource.status === "ACTIVE";
 
   return (
-    <div className="group relative flex flex-col justify-between rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-teal-500/30 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900/60 dark:hover:border-teal-500/30">
+    <div className="flex flex-col justify-between rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-sm hover:border-teal-500/40 hover:shadow-md transition-all dark:border-zinc-800 dark:bg-zinc-900/60">
       <div>
-        {/* Header: Category & Status */}
+        {/* Top Badges */}
         <div className="flex items-center justify-between gap-2">
           {resource.category && (
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-2.5 py-0.5 rounded-full border border-teal-200 dark:border-teal-900">
-              <Tag className="h-3 w-3" />
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-900">
+              <Layers className="h-2.5 w-2.5" />
               {resource.category.name}
             </span>
           )}
 
-          <Badge variant={statusConfig.variant} size="sm">
-            <StatusIcon className="h-3 w-3" />
-            {statusConfig.label}
+          <Badge
+            variant={isAvailable ? "success" : "neutral"}
+            className="text-[10px]"
+          >
+            {isAvailable ? "Available" : resource.status}
           </Badge>
         </div>
 
-        {/* Title & Description */}
-        <h3 className="mt-3 text-lg font-semibold tracking-tight text-zinc-900 group-hover:text-teal-700 dark:text-zinc-100 dark:group-hover:text-teal-400 transition-colors">
+        {/* Title */}
+        <h3 className="mt-4 text-lg font-bold text-zinc-900 dark:text-zinc-100 line-clamp-1">
           {resource.name}
         </h3>
 
-        {resource.description && (
-          <p className="mt-1.5 text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
-            {resource.description}
-          </p>
-        )}
+        {/* Description */}
+        <p className="mt-1.5 text-xs text-zinc-500 line-clamp-2 min-h-[2rem]">
+          {resource.description || "Fully equipped enterprise organizational resource."}
+        </p>
 
-        {/* Location & Capacity Details */}
-        <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-          <div className="flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5 text-zinc-400" />
-            <span>{resource.location}</span>
+        {/* Location & Capacity */}
+        <div className="mt-4 space-y-1.5 text-xs text-zinc-600 dark:text-zinc-400">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+            <span className="truncate">{resource.location}</span>
           </div>
 
-          {resource.capacity !== null && resource.capacity !== undefined && (
-            <div className="flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-zinc-400" />
-              <span>Capacity: {resource.capacity} people</span>
-            </div>
-          )}
-
-          {resource._count?.reservations !== undefined && (
-            <div className="flex items-center gap-1.5 text-zinc-500 ml-auto">
-              <Calendar className="h-3.5 w-3.5" />
-              <span>{resource._count.reservations} booked</span>
+          {resource.capacity && (
+            <div className="flex items-center gap-2">
+              <Users className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+              <span>Up to {resource.capacity} people</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Footer Actions */}
-      <div className="mt-5 pt-3 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-3">
+      {/* Action Footer */}
+      <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
         <Link
           href={`/resources/${resource.id}`}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 px-3.5 py-2.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-teal-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-teal-300"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-600 hover:text-teal-700 dark:text-teal-400 transition-colors"
         >
-          <span>View Availability & Schedule</span>
+          <span>View Schedule & Reserve</span>
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>

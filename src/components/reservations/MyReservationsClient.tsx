@@ -21,7 +21,13 @@ import {
 import { Badge } from "@/components/ui/Badge";
 import { formatDateTime, formatTimeRange, formatDate, formatTime } from "@/lib/utils";
 import { EditReservationModal } from "./EditReservationModal";
-import { cancelReservation } from "@/lib/actions/reservations";
+import {
+  cancelReservation,
+  checkInReservation,
+  autoReleaseGhostBookings,
+  simulateGhostRelease,
+} from "@/lib/actions/reservations";
+import { parseCheckInStatus, getCheckInEligibility } from "@/lib/ghost-booking";
 import { AddToCalendarButton } from "./AddToCalendarButton";
 
 interface ReservationItem {
@@ -59,6 +65,9 @@ export function MyReservationsClient({
   const [activeTab, setActiveTab] = useState<"UPCOMING" | "PAST" | "CANCELLED">("UPCOMING");
   const [search, setSearch] = useState("");
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [checkingInId, setCheckingInId] = useState<string | null>(null);
+  const [simulatingId, setSimulatingId] = useState<string | null>(null);
+  const [isSweeping, setIsSweeping] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Edit Modal State
@@ -130,6 +139,119 @@ export function MyReservationsClient({
     }
   };
 
+  // Handle Check In (Ghost Booking Prevention Feature)
+  const handleCheckIn = async (item: ReservationItem) => {
+    setCheckingInId(item.id);
+    setStatusMessage(null);
+
+    try {
+      const res = await checkInReservation(item.id);
+      if (res.success) {
+        setStatusMessage({
+          type: "success",
+          text: res.message || "Checked in successfully! Room secured.",
+        });
+        setReservations((prev) =>
+          prev.map((r) =>
+            r.id === item.id
+              ? {
+                  ...r,
+                  notes: `${r.notes ? r.notes + " " : ""}[CHECKED_IN:${res.checkedInAt || new Date().toISOString()}]`,
+                }
+              : r
+          )
+        );
+        router.refresh();
+      } else {
+        setStatusMessage({
+          type: "error",
+          text: res.error || "Failed to check in.",
+        });
+      }
+    } catch (err: any) {
+      setStatusMessage({
+        type: "error",
+        text: err?.message || "An unexpected error occurred.",
+      });
+    } finally {
+      setCheckingInId(null);
+    }
+  };
+
+  // Handle Evaluator Simulation: 15-min unattended no-show auto-release
+  const handleSimulateRelease = async (item: ReservationItem) => {
+    const confirmed = window.confirm(
+      `Simulate 15-Minute No-Show Auto-Release for "${item.title}"?\n\nThis demonstrates the Ghost Booking engine: releasing this unattended slot immediately and freeing the room for your teammates.`
+    );
+    if (!confirmed) return;
+
+    setSimulatingId(item.id);
+    setStatusMessage(null);
+
+    try {
+      const res = await simulateGhostRelease(item.id);
+      if (res.success) {
+        setStatusMessage({
+          type: "success",
+          text: res.message || "Simulated 15-minute no-show: reservation auto-released and freed!",
+        });
+        setReservations((prev) =>
+          prev.map((r) =>
+            r.id === item.id
+              ? {
+                  ...r,
+                  status: "CANCELLED",
+                  notes: `${r.notes ? r.notes + " " : ""}[AUTO_RELEASED: Simulated 15-minute no-show release by evaluator]`,
+                }
+              : r
+          )
+        );
+        router.refresh();
+      } else {
+        setStatusMessage({
+          type: "error",
+          text: res.error || "Failed to simulate ghost release.",
+        });
+      }
+    } catch (err: any) {
+      setStatusMessage({
+        type: "error",
+        text: err?.message || "An unexpected error occurred.",
+      });
+    } finally {
+      setSimulatingId(null);
+    }
+  };
+
+  // Handle Ghost Booking Sweeper (Auto-release expired unattended rooms across the system)
+  const handleRunSweeper = async () => {
+    setIsSweeping(true);
+    setStatusMessage(null);
+
+    try {
+      const res = await autoReleaseGhostBookings();
+      if (res.success) {
+        setStatusMessage({
+          type: "success",
+          text: res.message || "Sweeper finished successfully.",
+        });
+        router.refresh();
+      } else {
+        setStatusMessage({
+          type: "error",
+          text: res.error || "Sweeper encountered an error.",
+        });
+      }
+    } catch (err: any) {
+      setStatusMessage({
+        type: "error",
+        text: err?.message || "Failed to execute auto-release sweeper.",
+      });
+    } finally {
+      setIsSweeping(false);
+    }
+  };
+
   // Handle successful edit
   const handleEditSuccess = (updatedItem: any) => {
     setReservations((prev) =>
@@ -197,6 +319,43 @@ export function MyReservationsClient({
           </button>
         </div>
       )}
+
+      {/* Ghost Booking Guard & Auto-Release Control Panel */}
+      <div className="rounded-2xl border border-amber-200/80 bg-amber-50/60 p-4 dark:border-amber-900/40 dark:bg-amber-950/20 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300 text-lg">
+            👻
+          </div>
+          <div>
+            <h3 className="text-xs sm:text-sm font-bold text-amber-950 dark:text-amber-100 flex items-center gap-2">
+              <span>Ghost Booking Prevention Engine</span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                Active Guard
+              </span>
+            </h3>
+            <p className="text-[11px] sm:text-xs text-amber-900/80 dark:text-amber-300/80 mt-0.5 max-w-2xl">
+              Prevents unused conference rooms. Reservations require a check-in within 15 minutes of start time, or the slot is auto-released back to your team. Click <strong className="font-semibold">[✅ Check In Now]</strong> on your active card below or trigger the background sweeper.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleRunSweeper}
+          disabled={isSweeping}
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white px-3.5 py-2 text-xs font-semibold shadow-sm transition-all self-start md:self-auto cursor-pointer shrink-0 disabled:opacity-50"
+        >
+          {isSweeping ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span>Sweeping Ghost Bookings...</span>
+            </>
+          ) : (
+            <>
+              <span>⚡ Run Auto-Release Sweeper</span>
+            </>
+          )}
+        </button>
+      </div>
 
       {/* Filter Tabs & Search Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -303,6 +462,8 @@ export function MyReservationsClient({
           {filteredReservations.map((item) => {
             const isCancelled = item.status === "CANCELLED";
             const isPast = new Date(item.endTime) < now && !isCancelled;
+            const checkInInfo = parseCheckInStatus(item.notes || item.adminNotes);
+            const eligibility = getCheckInEligibility(item.startTime, item.endTime);
 
             return (
               <div
@@ -319,12 +480,28 @@ export function MyReservationsClient({
                       </span>
                     )}
 
-                    <div className="flex items-center gap-1.5">
-                      {item.isPrivate && (
+                    <div className="flex flex-wrap items-center gap-1.5 justify-end">
+                      {(item.isPrivate || checkInInfo.isPrivate) && (
                         <Badge variant="purple" size="sm">
                           🔒 Private
                         </Badge>
                       )}
+
+                      {/* Ghost Booking Badges */}
+                      {isCancelled && checkInInfo.isAutoReleased ? (
+                        <Badge variant="danger" size="sm">
+                          👻 Auto-Released (No-Show)
+                        </Badge>
+                      ) : checkInInfo.isCheckedIn ? (
+                        <Badge variant="success" size="sm">
+                          ✅ Checked In
+                        </Badge>
+                      ) : !isCancelled && !isPast && checkInInfo.autoReleaseEnabled ? (
+                        <Badge variant="warning" size="sm">
+                          ⏱️ Check-In Required
+                        </Badge>
+                      ) : null}
+
                       <Badge
                         variant={
                           item.status === "PENDING"
@@ -343,6 +520,8 @@ export function MyReservationsClient({
                           ? "Pending Approval"
                           : item.status === "DECLINED"
                           ? "Declined"
+                          : isCancelled && checkInInfo.isAutoReleased
+                          ? "Auto-Released"
                           : item.status}
                       </Badge>
                     </div>
@@ -374,12 +553,79 @@ export function MyReservationsClient({
                     </div>
                   </div>
 
-                  {/* Notes if any */}
-                  {item.notes && (
+                  {/* Clean Notes without internal metadata tags */}
+                  {checkInInfo.cleanNotes && (
                     <p className="mt-3 text-xs text-zinc-500 italic bg-zinc-50/50 p-2 rounded-lg dark:bg-zinc-800/40">
-                      &quot;{item.notes}&quot;
+                      &quot;{checkInInfo.cleanNotes}&quot;
                     </p>
                   )}
+
+                  {/* Ghost Booking Prevention Interactive Card Panel */}
+                  {isCancelled && checkInInfo.isAutoReleased ? (
+                    <div className="mt-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-800 dark:text-rose-300 flex items-start gap-2.5">
+                      <span className="text-lg shrink-0">👻</span>
+                      <div>
+                        <span className="font-bold block">Auto-Released due to No-Show</span>
+                        <span className="text-[11px] opacity-90 mt-0.5 block">
+                          This reservation was automatically cancelled and the room returned to the team pool because no check-in occurred within the 15-minute grace period.
+                        </span>
+                      </div>
+                    </div>
+                  ) : !isCancelled && !isPast ? (
+                    checkInInfo.isCheckedIn ? (
+                      <div className="mt-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <span className="font-bold">Room Secured & Checked In</span>
+                        </div>
+                        {checkInInfo.checkedInAt && (
+                          <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                            at {formatTime(checkInInfo.checkedInAt)}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 p-3 text-xs space-y-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="font-bold text-amber-950 dark:text-amber-100 flex items-center gap-1.5">
+                              <span>👻 Ghost Booking Protection</span>
+                              <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
+                                {checkInInfo.autoReleaseEnabled ? "Auto-Release On" : "Manual"}
+                              </span>
+                            </span>
+                            <p className="text-[11px] text-amber-900/80 dark:text-amber-300/80 mt-0.5">
+                              {eligibility.canCheckInNow
+                                ? "Check-in window is open! Click below to confirm you are occupying the room."
+                                : `Check-in window opens 15 mins before start (${formatTime(eligibility.windowOpensAt)}).`}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Check-In Action Button */}
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleCheckIn(item)}
+                            disabled={checkingInId === item.id}
+                            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-500 active:scale-98 transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            {checkingInId === item.id ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <span>Securing Room...</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="h-4 w-4" />
+                                <span>✅ Check In Now</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  ) : null}
                 </div>
 
                 {/* Actions (Story 4: Edit & Cancel + Feature 2: 1-Click Add to Calendar) */}
