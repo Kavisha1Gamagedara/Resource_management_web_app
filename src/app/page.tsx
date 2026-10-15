@@ -4,8 +4,6 @@ import { ResourceCard } from "@/components/resources/ResourceCard";
 import { Badge } from "@/components/ui/Badge";
 import { formatTimeRange } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/auth";
-import { getOperationsAnalytics } from "@/lib/analytics";
-import { OperationsInsightsWidget } from "@/components/dashboard/OperationsInsightsWidget";
 import {
   Building2,
   CalendarCheck2,
@@ -31,7 +29,6 @@ export default async function HomePage() {
     categories,
     recentResources,
     upcomingReservations,
-    operationsAnalytics,
   ] = await Promise.all([
     prisma.resource.count(),
     prisma.category.count(),
@@ -75,7 +72,6 @@ export default async function HomePage() {
         },
       },
     }),
-    isAdmin ? getOperationsAnalytics() : Promise.resolve(null),
   ]);
 
   return (
@@ -165,11 +161,6 @@ export default async function HomePage() {
           <p className="mt-1 text-xs text-zinc-500">Pre-seeded accounts</p>
         </div>
       </section>
-
-      {/* Feature 3: Facility Utilization & Peak-Hour Analytics Widget (RBAC: Admin Only) */}
-      {isAdmin && operationsAnalytics && (
-        <OperationsInsightsWidget analytics={operationsAnalytics} />
-      )}
 
       {/* Categories Bar */}
       <section className="space-y-4">

@@ -35,19 +35,29 @@ import {
   Search,
   CheckCircle2,
   RefreshCw,
+  CalendarDays,
+  Clock,
+  Building2,
+  XCircle,
 } from "lucide-react";
 import { ResourceStatus, Role } from "@prisma/client";
+import { format } from "date-fns";
+import { AdminCreateReservationModal } from "./AdminCreateReservationModal";
+import { cancelReservation } from "@/lib/actions/reservations";
+import { formatDate, formatTime } from "@/lib/utils";
 
 interface AdminDashboardClientProps {
   initialResources: any[];
   categories: any[];
   initialUsers?: any[];
+  initialReservations?: any[];
 }
 
 export function AdminDashboardClient({
   initialResources,
   categories,
   initialUsers = [],
+  initialReservations = [],
 }: AdminDashboardClientProps) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -104,8 +114,62 @@ export function AdminDashboardClient({
     setIsModalOpen(true);
   };
 
-  // User Management State (ADMIN ONLY)
-  const [activeTab, setActiveTab] = React.useState<"resources" | "users">("resources");
+  // Navigation Tabs & Reservation Management State (ADMIN ONLY)
+  const [activeTab, setActiveTab] = React.useState<"resources" | "users" | "reservations">("resources");
+  const [isAdminReservationModalOpen, setIsAdminReservationModalOpen] = React.useState(false);
+  const [reservationSearch, setReservationSearch] = React.useState("");
+  const [reservationStatusFilter, setReservationStatusFilter] = React.useState<"ALL" | "CONFIRMED" | "CANCELLED">("ALL");
+  const [reservationDeptFilter, setReservationDeptFilter] = React.useState<string>("ALL");
+  const [reservationDateFilter, setReservationDateFilter] = React.useState<string>("");
+
+  // Distinct departments across all reservations
+  const allDepartments = React.useMemo(() => {
+    const set = new Set<string>();
+    (initialReservations || []).forEach((r: any) => {
+      if (r.user?.department) set.add(r.user.department);
+    });
+    (initialUsers || []).forEach((u: any) => {
+      if (u.department) set.add(u.department);
+    });
+    return Array.from(set).sort();
+  }, [initialReservations, initialUsers]);
+
+  // Filtered reservations for admin view
+  const filteredReservations = React.useMemo(() => {
+    return (initialReservations || []).filter((r: any) => {
+      if (reservationStatusFilter !== "ALL" && r.status !== reservationStatusFilter) {
+        return false;
+      }
+      if (reservationDeptFilter !== "ALL" && r.user?.department !== reservationDeptFilter) {
+        return false;
+      }
+      if (reservationDateFilter) {
+        const startDayStr = format(new Date(r.startTime), "yyyy-MM-dd");
+        const endDayStr = format(new Date(r.endTime), "yyyy-MM-dd");
+        if (startDayStr !== reservationDateFilter && endDayStr !== reservationDateFilter) {
+          const filterStart = new Date(reservationDateFilter + "T00:00:00").getTime();
+          const filterEnd = new Date(reservationDateFilter + "T23:59:59.999").getTime();
+          const s = new Date(r.startTime).getTime();
+          const e = new Date(r.endTime).getTime();
+          if (s > filterEnd || e < filterStart) {
+            return false;
+          }
+        }
+      }
+      if (!reservationSearch.trim()) return true;
+
+      const q = reservationSearch.toLowerCase();
+      const titleMatch = r.title?.toLowerCase().includes(q);
+      const userNameMatch = r.user?.name?.toLowerCase().includes(q);
+      const userEmailMatch = r.user?.email?.toLowerCase().includes(q);
+      const resourceNameMatch = r.resource?.name?.toLowerCase().includes(q);
+      const locationMatch = r.resource?.location?.toLowerCase().includes(q);
+      const deptMatch = r.user?.department?.toLowerCase().includes(q);
+
+      return titleMatch || userNameMatch || userEmailMatch || resourceNameMatch || locationMatch || deptMatch;
+    });
+  }, [initialReservations, reservationStatusFilter, reservationDeptFilter, reservationDateFilter, reservationSearch]);
+
   const [isUserModalOpen, setIsUserModalOpen] = React.useState(false);
   const [userSearch, setUserSearch] = React.useState("");
   const [userRoleFilter, setUserRoleFilter] = React.useState<"ALL" | "ADMIN" | "USER">("ALL");
@@ -304,20 +368,24 @@ export function AdminDashboardClient({
             <Button onClick={openAddModal} size="md" className="shrink-0 bg-purple-600 hover:bg-purple-500 border-purple-500/30">
               <Plus className="w-4 h-4 mr-1.5" /> Add New Resource
             </Button>
-          ) : (
+          ) : activeTab === "users" ? (
             <Button onClick={openAddUserModal} size="md" className="shrink-0 bg-emerald-600 hover:bg-emerald-500 border-emerald-500/30">
               <UserPlus className="w-4 h-4 mr-1.5" /> Provision New User
+            </Button>
+          ) : (
+            <Button onClick={() => setIsAdminReservationModalOpen(true)} size="md" className="shrink-0 bg-purple-600 hover:bg-purple-500 border-purple-500/30">
+              <UserPlus className="w-4 h-4 mr-1.5" /> + Book for User
             </Button>
           )}
         </div>
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
         <button
           type="button"
           onClick={() => setActiveTab("resources")}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center gap-2 transition-all ${
+          className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center gap-2 transition-all cursor-pointer ${
             activeTab === "resources"
               ? "bg-purple-600/20 text-purple-300 border border-purple-500/40 shadow-sm"
               : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
@@ -333,7 +401,7 @@ export function AdminDashboardClient({
         <button
           type="button"
           onClick={() => setActiveTab("users")}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center gap-2 transition-all ${
+          className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center gap-2 transition-all cursor-pointer ${
             activeTab === "users"
               ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
               : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
@@ -343,6 +411,22 @@ export function AdminDashboardClient({
           <span>Company Personnel & RBAC</span>
           <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-800 text-emerald-300 font-mono">
             {initialUsers.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("reservations")}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center gap-2 transition-all cursor-pointer ${
+            activeTab === "reservations"
+              ? "bg-purple-600/20 text-purple-300 border border-purple-500/40 shadow-sm"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+          }`}
+        >
+          <CalendarDays className="w-4 h-4" />
+          <span>All User Reservations</span>
+          <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-purple-950/80 border border-purple-800 text-purple-300 font-mono">
+            {initialReservations.length}
           </span>
         </button>
       </div>
@@ -582,6 +666,185 @@ export function AdminDashboardClient({
                         <span className="px-2.5 py-1 rounded bg-slate-950 border border-slate-800 text-slate-300 font-mono">
                           {u._count?.reservations || 0} reservations
                         </span>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Company Reservations Tab (ADMIN ONLY) */}
+      {activeTab === "reservations" && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Status Filter */}
+              <div className="inline-flex rounded-xl bg-slate-900/80 border border-slate-800 p-1">
+                {(["ALL", "CONFIRMED", "CANCELLED"] as const).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setReservationStatusFilter(st)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                      reservationStatusFilter === st
+                        ? "bg-purple-600 text-white shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {st === "ALL" ? "All Bookings" : st === "CONFIRMED" ? "Confirmed" : "Cancelled"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Department Filter */}
+              <select
+                value={reservationDeptFilter}
+                onChange={(e) => setReservationDeptFilter(e.target.value)}
+                className="bg-slate-900 border border-slate-800 text-xs rounded-xl px-3 py-2 text-slate-200 outline-none focus:border-purple-500 cursor-pointer"
+              >
+                <option value="ALL">All Departments</option>
+                {allDepartments.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
+
+              {/* Date Filter */}
+              <div className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 shadow-sm">
+                <CalendarDays className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <input
+                  type="date"
+                  value={reservationDateFilter}
+                  onChange={(e) => setReservationDateFilter(e.target.value)}
+                  className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer [color-scheme:dark]"
+                  title="Filter company reservations by date"
+                />
+                {reservationDateFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setReservationDateFilter("")}
+                    className="text-[11px] font-bold text-rose-400 hover:text-rose-300 ml-1 px-1 py-0.5 rounded transition-colors"
+                    title="Clear date filter"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Input
+                placeholder="Search employee, facility, title..."
+                value={reservationSearch}
+                onChange={(e) => setReservationSearch(e.target.value)}
+                className="pl-9 text-xs"
+              />
+            </div>
+          </div>
+
+          {/* Reservations List */}
+          <div className="space-y-3">
+            {filteredReservations.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-slate-800 rounded-xl bg-slate-900/30 space-y-3">
+                <CalendarDays className="w-8 h-8 text-slate-600 mx-auto" />
+                <p className="text-sm text-slate-400">
+                  {reservationDateFilter
+                    ? `No company reservations found for date ${reservationDateFilter}.`
+                    : "No company reservations found matching filter criteria."}
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  {reservationDateFilter && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReservationDateFilter("")}
+                      className="text-xs"
+                    >
+                      Clear Date Filter
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => setIsAdminReservationModalOpen(true)}
+                    size="sm"
+                    className="bg-purple-600 hover:bg-purple-500 text-white text-xs"
+                  >
+                    <UserPlus className="w-4 h-4 mr-1.5" /> Book on Behalf of User
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              filteredReservations.map((res: any) => {
+                const isCancelled = res.status === "CANCELLED";
+                const isPast = new Date(res.endTime).getTime() <= Date.now();
+                return (
+                  <Card
+                    key={res.id}
+                    className="border-slate-800 bg-slate-900/80 p-4 hover:border-slate-700/80 transition-colors"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-sm text-white">
+                            {res.title}
+                          </span>
+                          <Badge
+                            variant={isCancelled ? "danger" : isPast ? "neutral" : "success"}
+                            size="sm"
+                          >
+                            {isCancelled ? "CANCELLED" : isPast ? "PAST / CONCLUDED" : res.status}
+                          </Badge>
+                          {res.notes?.includes("[BOOKED_BY_ADMIN") && (
+                            <Badge variant="purple" size="sm">
+                              👑 Booked by Admin
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
+                          <span className="flex items-center gap-1.5 text-purple-300 font-medium">
+                            <Users className="w-3.5 h-3.5 text-purple-400" />
+                            <span>{res.user?.name} ({res.user?.department || "General"})</span>
+                          </span>
+                          <span className="flex items-center gap-1.5 text-teal-300 font-medium">
+                            <Building2 className="w-3.5 h-3.5 text-teal-400" />
+                            <span>{res.resource?.name} ({res.resource?.location})</span>
+                          </span>
+                          <span className="flex items-center gap-1.5 font-mono text-slate-300">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            <span>
+                              {formatDate(res.startTime)} • {formatTime(res.startTime)} – {formatTime(res.endTime)}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end md:self-center">
+                        {!isCancelled && !isPast && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="text-xs"
+                            onClick={async () => {
+                              if (window.confirm(`Cancel reservation for "${res.title}" booked by ${res.user?.name}?`)) {
+                                await cancelReservation(res.id);
+                                router.refresh();
+                              }
+                            }}
+                          >
+                            <XCircle className="w-3.5 h-3.5 mr-1" /> Cancel
+                          </Button>
+                        )}
+                        {isPast && !isCancelled && (
+                          <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> Past
+                          </span>
+                        )}
                       </div>
                     </div>
                   </Card>
@@ -929,6 +1192,20 @@ export function AdminDashboardClient({
             </div>
           </form>
         </Modal>
+      )}
+
+      {/* Admin Book on Behalf of User Modal */}
+      {isAdminReservationModalOpen && (
+        <AdminCreateReservationModal
+          isOpen={isAdminReservationModalOpen}
+          onClose={() => setIsAdminReservationModalOpen(false)}
+          onSuccess={() => {
+            setIsAdminReservationModalOpen(false);
+            router.refresh();
+          }}
+          users={initialUsers}
+          resources={initialResources}
+        />
       )}
     </div>
   );

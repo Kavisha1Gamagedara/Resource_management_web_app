@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx tests/conflict-detection.ts && tsx tests/ghost-booking.ts && tsx tests/turnaround-buffer.ts && tsx tests/admin-user-creation.ts"
+    "test": "tsx tests/conflict-detection.ts && tsx tests/ghost-booking.ts && tsx tests/turnaround-buffer.ts && tsx tests/admin-user-creation.ts && tsx tests/admin-book-on-behalf.ts && tsx tests/admin-cancellation-reason.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

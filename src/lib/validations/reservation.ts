@@ -3,6 +3,7 @@ import { z } from "zod";
 export const reservationSchema = z
   .object({
     resourceId: z.string().min(1, "Resource ID is required"),
+    userId: z.string().optional(), // Admin-only: book on behalf of user
     title: z
       .string()
       .min(3, "Title must be at least 3 characters")

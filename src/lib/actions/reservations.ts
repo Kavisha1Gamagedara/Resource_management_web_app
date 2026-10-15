@@ -58,6 +58,22 @@ export async function createReservation(input: ReservationInput) {
       else tags.push("[AUTO_RELEASE_DISABLED]");
       if (isPrivate) tags.push("[PRIVATE]");
 
+      // Support booking on behalf of another user (Admin privilege)
+      let bookingUserId = user.id;
+      if (validatedData.userId && validatedData.userId !== user.id) {
+        if (user.role !== Role.ADMIN) {
+          throw new Error("Only administrators can create reservations on behalf of other users.");
+        }
+        const targetUser = await tx.user.findUnique({
+          where: { id: validatedData.userId },
+        });
+        if (!targetUser) {
+          throw new Error("Specified user for reservation does not exist.");
+        }
+        bookingUserId = targetUser.id;
+        tags.push(`[BOOKED_BY_ADMIN:${user.name || "Administrator"}]`);
+      }
+
       const userNotes = validatedData.notes?.trim() || "";
       const finalNotes = tags.length > 0 ? `${tags.join(" ")} ${userNotes}`.trim() : userNotes || null;
 
@@ -69,7 +85,7 @@ export async function createReservation(input: ReservationInput) {
           startTime: validatedData.startTime,
           endTime: validatedData.endTime,
           resourceId: validatedData.resourceId,
-          userId: user.id,
+          userId: bookingUserId,
           status: ReservationStatus.CONFIRMED,
         },
         include: {
@@ -81,6 +97,8 @@ export async function createReservation(input: ReservationInput) {
 
     revalidatePath("/");
     revalidatePath("/admin");
+    revalidatePath("/my-reservations");
+    revalidatePath("/reservations");
     revalidatePath("/resources");
     revalidatePath(`/resources/${validatedData.resourceId}`);
     revalidatePath("/reservations");
@@ -115,6 +133,11 @@ export async function updateReservation(id: string, input: ReservationInput) {
     // Role check: Only the creator or an ADMIN can modify
     if (existingReservation.userId !== user.id && user.role !== "ADMIN") {
       throw new Error("You do not have permission to modify this reservation.");
+    }
+
+    // Guard: Past reservations cannot be edited
+    if (new Date(existingReservation.endTime).getTime() <= Date.now()) {
+      throw new Error("Past reservations cannot be edited or modified.");
     }
 
     const validatedData = reservationSchema.parse(input);
@@ -175,15 +198,17 @@ export async function updateReservation(id: string, input: ReservationInput) {
 }
 
 /**
- * Story 4: Cancel reservation to immediately free up the slot
+ * Story 4: Cancel reservation to immediately free up the slot.
+ * If cancelled by an administrator for a team member, a justification reason is required and notified to the user.
  */
-export async function cancelReservation(id: string) {
+export async function cancelReservation(id: string, reason?: string) {
   try {
     const user = await requireAuth();
     if (!id) throw new Error("Reservation ID is required.");
 
     const existingReservation = await prisma.reservation.findUnique({
       where: { id },
+      include: { resource: true, user: true },
     });
 
     if (!existingReservation) {
@@ -195,10 +220,34 @@ export async function cancelReservation(id: string) {
       throw new Error("You do not have permission to cancel this reservation.");
     }
 
+    // Guard: Past reservations cannot be cancelled
+    if (new Date(existingReservation.endTime).getTime() <= Date.now()) {
+      throw new Error("Past reservations cannot be cancelled.");
+    }
+
+    const isAdminCancellingOther = user.role === "ADMIN" && existingReservation.userId !== user.id;
+
+    if (isAdminCancellingOther && (!reason || !reason.trim())) {
+      throw new Error("Please provide a reason when cancelling a user's reservation.");
+    }
+
+    const existingNotes = existingReservation.notes ? `${existingReservation.notes} ` : "";
+    let updatedNotes = existingReservation.notes;
+
+    if (isAdminCancellingOther) {
+      const adminName = user.name || "Administrator";
+      updatedNotes = `${existingNotes}[CANCELLED_BY_ADMIN:${adminName}] [REASON:${reason!.trim()}]`.trim();
+    } else if (reason?.trim()) {
+      updatedNotes = `${existingNotes}[CANCEL_REASON:${reason.trim()}]`.trim();
+    }
+
     const cancelled = await prisma.reservation.update({
       where: { id },
-      data: { status: ReservationStatus.CANCELLED },
-      include: { resource: true },
+      data: {
+        status: ReservationStatus.CANCELLED,
+        notes: updatedNotes,
+      },
+      include: { resource: true, user: true },
     });
 
     revalidatePath("/");
@@ -555,6 +604,31 @@ export async function getMyReservations() {
     include: {
       resource: {
         include: { category: true },
+      },
+    },
+  });
+}
+
+/**
+ * Admin: Query all company reservations across all users
+ */
+export async function getAllReservations() {
+  const user = await requireAdmin();
+  return await prisma.reservation.findMany({
+    orderBy: { startTime: "asc" },
+    include: {
+      resource: {
+        include: { category: true },
+      },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          department: true,
+          role: true,
+          avatarUrl: true,
+        },
       },
     },
   });

@@ -61,6 +61,10 @@ export function parseCheckInStatus(notes?: string | null): ParsedCheckInStatus {
     .replace(/\[AUTO_RELEASED[^\]]*\]/g, "")
     .replace(/AUTO_RELEASED[^\n;]*/g, "")
     .replace(/\[PRIVATE\]/g, "")
+    .replace(/\[BOOKED_BY_ADMIN:[^\]]+\]/g, "")
+    .replace(/\[CANCELLED_BY_ADMIN:[^\]]+\]/g, "")
+    .replace(/\[REASON:[^\]]+\]/g, "")
+    .replace(/\[CANCEL_REASON:[^\]]+\]/g, "")
     .trim();
 
   return {
@@ -104,4 +108,45 @@ export function getCheckInEligibility(startTime: Date | string, endTime: Date | 
     minutesUntilStart,
     minutesSinceStart,
   };
+}
+
+export interface ParsedCancellationInfo {
+  isCancelledByAdmin: boolean;
+  cancelledBy?: string;
+  reason?: string;
+}
+
+/**
+ * Parses cancellation metadata to retrieve admin justifications and notification details for the employee
+ */
+export function parseCancellationReason(notes?: string | null): ParsedCancellationInfo {
+  if (!notes) return { isCancelledByAdmin: false };
+
+  const adminMatch = notes.match(/\[CANCELLED_BY_ADMIN:([^\]]+)\]/);
+  const reasonMatch = notes.match(/\[REASON:([^\]]+)\]/);
+  const cancelReasonMatch = notes.match(/\[CANCEL_REASON:([^\]]+)\]/);
+
+  if (adminMatch) {
+    return {
+      isCancelledByAdmin: true,
+      cancelledBy: adminMatch[1].trim(),
+      reason: reasonMatch ? reasonMatch[1].trim() : undefined,
+    };
+  }
+
+  if (reasonMatch) {
+    return {
+      isCancelledByAdmin: true,
+      reason: reasonMatch[1].trim(),
+    };
+  }
+
+  if (cancelReasonMatch) {
+    return {
+      isCancelledByAdmin: false,
+      reason: cancelReasonMatch[1].trim(),
+    };
+  }
+
+  return { isCancelledByAdmin: false };
 }

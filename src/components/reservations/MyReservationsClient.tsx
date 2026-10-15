@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import {
   Calendar,
   Clock,
@@ -17,17 +18,24 @@ import {
   Search,
   ArrowRight,
   ExternalLink,
+  UserPlus,
+  Users,
+  Filter,
+  User,
+  RotateCcw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { formatDateTime, formatTimeRange, formatDate, formatTime } from "@/lib/utils";
 import { EditReservationModal } from "./EditReservationModal";
+import { AdminCreateReservationModal } from "@/components/admin/AdminCreateReservationModal";
+import { CancelReservationModal } from "./CancelReservationModal";
 import {
   cancelReservation,
   checkInReservation,
   autoReleaseGhostBookings,
   simulateGhostRelease,
 } from "@/lib/actions/reservations";
-import { parseCheckInStatus, getCheckInEligibility } from "@/lib/ghost-booking";
+import { parseCheckInStatus, getCheckInEligibility, parseCancellationReason } from "@/lib/ghost-booking";
 import { AddToCalendarButton } from "./AddToCalendarButton";
 
 interface ReservationItem {
@@ -40,6 +48,15 @@ interface ReservationItem {
   isPrivate?: boolean;
   adminNotes?: string | null;
   resourceId: string;
+  userId?: string;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    department?: string | null;
+    role?: string;
+    avatarUrl?: string | null;
+  } | null;
   resource: {
     id: string;
     name: string;
@@ -54,17 +71,29 @@ interface ReservationItem {
 interface MyReservationsClientProps {
   initialReservations: ReservationItem[];
   userName: string;
+  isAdmin?: boolean;
+  currentUserId?: string;
+  companyUsers?: any[];
+  resources?: any[];
 }
 
 export function MyReservationsClient({
   initialReservations,
   userName,
+  isAdmin = false,
+  currentUserId,
+  companyUsers = [],
+  resources = [],
 }: MyReservationsClientProps) {
   const router = useRouter();
   const [reservations, setReservations] = useState<ReservationItem[]>(initialReservations);
   const [activeTab, setActiveTab] = useState<"UPCOMING" | "PAST" | "CANCELLED">("UPCOMING");
   const [search, setSearch] = useState("");
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [selectedUserFilter, setSelectedUserFilter] = useState<string>("ALL");
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>("ALL");
+  const [selectedDateFilter, setSelectedDateFilter] = useState<string>("");
+  const [isAdminBookModalOpen, setIsAdminBookModalOpen] = useState(false);
+
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
   const [simulatingId, setSimulatingId] = useState<string | null>(null);
   const [isSweeping, setIsSweeping] = useState(false);
@@ -74,9 +103,37 @@ export function MyReservationsClient({
   const [reservationToEdit, setReservationToEdit] = useState<ReservationItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const now = new Date();
+  // Cancel Modal State (with mandatory reason for admin actions)
+  const [reservationToCancel, setReservationToCancel] = useState<ReservationItem | null>(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
 
-  // Filter reservations based on active tab and search query
+  const now = new Date();
+  const todayStr = format(now, "yyyy-MM-dd");
+
+  const handleTabChange = (tab: "UPCOMING" | "PAST" | "CANCELLED") => {
+    setActiveTab(tab);
+    if (selectedDateFilter) {
+      if (tab === "UPCOMING" && selectedDateFilter < todayStr) {
+        setSelectedDateFilter("");
+      } else if (tab === "PAST" && selectedDateFilter > todayStr) {
+        setSelectedDateFilter("");
+      }
+    }
+  };
+
+  // Distinct departments across all bookings and company users
+  const departments = useMemo(() => {
+    const set = new Set<string>();
+    reservations.forEach((r: any) => {
+      if (r.user?.department) set.add(r.user.department);
+    });
+    companyUsers.forEach((u: any) => {
+      if (u.department) set.add(u.department);
+    });
+    return Array.from(set).sort();
+  }, [reservations, companyUsers]);
+
+  // Filter reservations based on active tab, search, user, department, and date
   const filteredReservations = reservations.filter((item) => {
     const isCancelled = item.status === "CANCELLED";
     const itemEnd = new Date(item.endTime);
@@ -90,6 +147,38 @@ export function MyReservationsClient({
 
     if (!tabMatch) return false;
 
+    // Filter by specific date
+    if (selectedDateFilter) {
+      const startDayStr = format(new Date(item.startTime), "yyyy-MM-dd");
+      const endDayStr = format(new Date(item.endTime), "yyyy-MM-dd");
+      if (startDayStr !== selectedDateFilter && endDayStr !== selectedDateFilter) {
+        const filterStart = new Date(selectedDateFilter + "T00:00:00").getTime();
+        const filterEnd = new Date(selectedDateFilter + "T23:59:59.999").getTime();
+        const s = new Date(item.startTime).getTime();
+        const e = new Date(item.endTime).getTime();
+        if (s > filterEnd || e < filterStart) {
+          return false;
+        }
+      }
+    }
+
+    // Admin employee filter
+    if (
+      selectedUserFilter !== "ALL" &&
+      item.userId !== selectedUserFilter &&
+      item.user?.id !== selectedUserFilter
+    ) {
+      return false;
+    }
+
+    // Admin department filter
+    if (
+      selectedDeptFilter !== "ALL" &&
+      item.user?.department !== selectedDeptFilter
+    ) {
+      return false;
+    }
+
     if (!search.trim()) return true;
 
     const q = search.toLowerCase();
@@ -97,47 +186,22 @@ export function MyReservationsClient({
     const resourceMatch = item.resource.name.toLowerCase().includes(q);
     const locationMatch = item.resource.location.toLowerCase().includes(q);
     const notesMatch = item.notes?.toLowerCase().includes(q) || false;
+    const userNameMatch = item.user?.name?.toLowerCase().includes(q) || false;
+    const userEmailMatch = item.user?.email?.toLowerCase().includes(q) || false;
+    const deptMatch = item.user?.department?.toLowerCase().includes(q) || false;
 
-    return titleMatch || resourceMatch || locationMatch || notesMatch;
+    return (
+      titleMatch ||
+      resourceMatch ||
+      locationMatch ||
+      notesMatch ||
+      userNameMatch ||
+      userEmailMatch ||
+      deptMatch
+    );
   });
 
-  // Handle Cancel Booking
-  const handleCancel = async (item: ReservationItem) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to cancel your reservation for "${item.title}"?\nThis slot will immediately become available for others to book.`
-    );
-    if (!confirmed) return;
 
-    setCancellingId(item.id);
-    setStatusMessage(null);
-
-    try {
-      const res = await cancelReservation(item.id);
-      if (res.success) {
-        setStatusMessage({
-          type: "success",
-          text: `Reservation for "${item.title}" successfully cancelled. Time slot freed.`,
-        });
-        // Optimistically update list
-        setReservations((prev) =>
-          prev.map((r) => (r.id === item.id ? { ...r, status: "CANCELLED" } : r))
-        );
-        router.refresh();
-      } else {
-        setStatusMessage({
-          type: "error",
-          text: res.error || "Failed to cancel reservation.",
-        });
-      }
-    } catch (err: any) {
-      setStatusMessage({
-        type: "error",
-        text: err?.message || "An unexpected error occurred.",
-      });
-    } finally {
-      setCancellingId(null);
-    }
-  };
 
   // Handle Check In (Ghost Booking Prevention Feature)
   const handleCheckIn = async (item: ReservationItem) => {
@@ -264,6 +328,22 @@ export function MyReservationsClient({
     router.refresh();
   };
 
+  // Handle successful cancellation from modal
+  const handleCancelSuccess = (cancelledReservation: any) => {
+    setReservations((prev) =>
+      prev.map((r) =>
+        r.id === cancelledReservation.id
+          ? { ...r, ...cancelledReservation, status: "CANCELLED" }
+          : r
+      )
+    );
+    setStatusMessage({
+      type: "success",
+      text: `Reservation for "${cancelledReservation.title}" has been cancelled.`,
+    });
+    router.refresh();
+  };
+
   const upcomingCount = reservations.filter(
     (r) => r.status !== "CANCELLED" && new Date(r.endTime) >= now
   ).length;
@@ -277,21 +357,43 @@ export function MyReservationsClient({
       {/* Top Banner / Welcome */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200/80 pb-5 dark:border-zinc-800">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
-            My Reservations
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
+              {isAdmin ? "Company Reservations" : "My Reservations"}
+            </h1>
+            {isAdmin && (
+              <Badge variant="purple" size="sm" className="font-bold">
+                ADMIN AUDIT & MANAGEMENT
+              </Badge>
+            )}
+          </div>
           <p className="mt-1 text-xs sm:text-sm text-zinc-500">
-            Manage your personal facility bookings, reschedule timeslots, or export directly to your calendar.
+            {isAdmin
+              ? "All employee bookings across PrimeWave facilities. Audit reservations, prevent ghost bookings, or create bookings on behalf of users upon request."
+              : "Manage your personal facility bookings, reschedule timeslots, or export directly to your calendar."}
           </p>
         </div>
 
-        <Link
-          href="/resources"
-          className="inline-flex items-center gap-2 rounded-2xl bg-teal-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-500 transition-all self-start sm:self-auto"
-        >
-          <Building2 className="h-4 w-4" />
-          <span>New Reservation</span>
-        </Link>
+        <div className="flex items-center gap-2.5">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setIsAdminBookModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-2xl bg-purple-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-purple-500 transition-all cursor-pointer"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>+ Book for User</span>
+            </button>
+          )}
+
+          <Link
+            href="/resources"
+            className="inline-flex items-center gap-2 rounded-2xl bg-teal-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-500 transition-all self-start sm:self-auto"
+          >
+            <Building2 className="h-4 w-4" />
+            <span>New Reservation</span>
+          </Link>
+        </div>
       </div>
 
       {/* Toast / Notification Banner */}
@@ -362,7 +464,7 @@ export function MyReservationsClient({
         {/* Tabs */}
         <div className="inline-flex rounded-2xl bg-zinc-100 p-1 dark:bg-zinc-800/60 self-start">
           <button
-            onClick={() => setActiveTab("UPCOMING")}
+            onClick={() => handleTabChange("UPCOMING")}
             className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
               activeTab === "UPCOMING"
                 ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100"
@@ -382,7 +484,7 @@ export function MyReservationsClient({
           </button>
 
           <button
-            onClick={() => setActiveTab("PAST")}
+            onClick={() => handleTabChange("PAST")}
             className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
               activeTab === "PAST"
                 ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100"
@@ -402,7 +504,7 @@ export function MyReservationsClient({
           </button>
 
           <button
-            onClick={() => setActiveTab("CANCELLED")}
+            onClick={() => handleTabChange("CANCELLED")}
             className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
               activeTab === "CANCELLED"
                 ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100"
@@ -422,16 +524,81 @@ export function MyReservationsClient({
           </button>
         </div>
 
-        {/* Search */}
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
-          <input
-            type="text"
-            placeholder="Search my bookings..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-zinc-200 bg-white py-2 pl-10 pr-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-teal-500 focus:outline-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 shadow-sm"
-          />
+        {/* Filters & Search */}
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          {/* Date Filter */}
+          <div className="flex items-center gap-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1.5 shadow-sm">
+            <Calendar className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+            <input
+              type="date"
+              value={selectedDateFilter}
+              min={activeTab === "UPCOMING" ? todayStr : undefined}
+              max={activeTab === "PAST" ? todayStr : undefined}
+              onChange={(e) => setSelectedDateFilter(e.target.value)}
+              className="bg-transparent text-xs text-zinc-800 dark:text-zinc-200 outline-none cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
+              title={
+                activeTab === "UPCOMING"
+                  ? "Filter upcoming reservations by date (past dates disabled)"
+                  : activeTab === "PAST"
+                  ? "Filter past history by date"
+                  : "Filter reservations by date"
+              }
+            />
+            {selectedDateFilter && (
+              <button
+                type="button"
+                onClick={() => setSelectedDateFilter("")}
+                className="text-[11px] font-bold text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 ml-1 px-1 py-0.5 rounded transition-colors"
+                title="Clear date filter"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {isAdmin && (
+            <>
+              {/* Department Filter */}
+              <select
+                value={selectedDeptFilter}
+                onChange={(e) => setSelectedDeptFilter(e.target.value)}
+                className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-800 dark:text-zinc-200 outline-none focus:border-purple-500 shadow-sm cursor-pointer"
+              >
+                <option value="ALL">All Departments</option>
+                {departments.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
+
+              {/* Employee Filter */}
+              <select
+                value={selectedUserFilter}
+                onChange={(e) => setSelectedUserFilter(e.target.value)}
+                className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-800 dark:text-zinc-200 outline-none focus:border-purple-500 shadow-sm max-w-[200px] cursor-pointer"
+              >
+                <option value="ALL">All Employees ({companyUsers.length || "All"})</option>
+                {companyUsers.map((u: any) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.department || "General"})
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+
+          {/* Search */}
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+            <input
+              type="text"
+              placeholder={isAdmin ? "Search employee, facility, title..." : "Search my bookings..."}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-xl border border-zinc-200 bg-white py-2 pl-10 pr-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-purple-500 dark:focus:border-purple-500 focus:outline-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 shadow-sm"
+            />
+          </div>
         </div>
       </div>
 
@@ -443,11 +610,34 @@ export function MyReservationsClient({
             No {activeTab.toLowerCase()} bookings found
           </h3>
           <p className="mt-1 text-xs text-zinc-500">
-            {activeTab === "UPCOMING"
+            {selectedDateFilter
+              ? `No ${activeTab.toLowerCase()} reservations found on ${selectedDateFilter}.`
+              : isAdmin
+              ? `No ${activeTab.toLowerCase()} company reservations match the selected filters.`
+              : activeTab === "UPCOMING"
               ? "You do not have any upcoming reservations scheduled."
               : `No ${activeTab.toLowerCase()} reservations recorded.`}
           </p>
-          {activeTab === "UPCOMING" && (
+          {selectedDateFilter && (
+            <button
+              type="button"
+              onClick={() => setSelectedDateFilter("")}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 transition-colors cursor-pointer"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Clear Date Filter</span>
+            </button>
+          )}
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={() => setIsAdminBookModalOpen(true)}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-purple-500 transition-all cursor-pointer"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>Create Reservation for User</span>
+            </button>
+          ) : activeTab === "UPCOMING" ? (
             <Link
               href="/resources"
               className="mt-5 inline-flex items-center gap-2 rounded-xl bg-teal-600 px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-500 transition-all"
@@ -455,14 +645,15 @@ export function MyReservationsClient({
               <span>Explore Facilities & Reserve a Slot</span>
               <ArrowRight className="h-4 w-4" />
             </Link>
-          )}
+          ) : null}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredReservations.map((item) => {
             const isCancelled = item.status === "CANCELLED";
-            const isPast = new Date(item.endTime) < now && !isCancelled;
+            const isPast = new Date(item.endTime).getTime() <= Date.now();
             const checkInInfo = parseCheckInStatus(item.notes || item.adminNotes);
+            const cancellationInfo = parseCancellationReason(item.notes || item.adminNotes);
             const eligibility = getCheckInEligibility(item.startTime, item.endTime);
 
             return (
@@ -487,10 +678,14 @@ export function MyReservationsClient({
                         </Badge>
                       )}
 
-                      {/* Ghost Booking Badges */}
+                      {/* Ghost Booking Badges & Cancellation Badges */}
                       {isCancelled && checkInInfo.isAutoReleased ? (
                         <Badge variant="danger" size="sm">
                           👻 Auto-Released (No-Show)
+                        </Badge>
+                      ) : isCancelled && cancellationInfo.isCancelledByAdmin ? (
+                        <Badge variant="danger" size="sm">
+                          🛡️ Cancelled by Admin
                         </Badge>
                       ) : checkInInfo.isCheckedIn ? (
                         <Badge variant="success" size="sm">
@@ -522,6 +717,12 @@ export function MyReservationsClient({
                           ? "Declined"
                           : isCancelled && checkInInfo.isAutoReleased
                           ? "Auto-Released"
+                          : isCancelled && cancellationInfo.isCancelledByAdmin
+                          ? "Admin Cancelled"
+                          : isCancelled
+                          ? "Cancelled"
+                          : isPast
+                          ? "Past / Concluded"
                           : item.status}
                       </Badge>
                     </div>
@@ -538,6 +739,30 @@ export function MyReservationsClient({
                     <span>•</span>
                     <span className="text-zinc-500">{item.resource.location}</span>
                   </div>
+
+                  {/* Employee Information (Admin view / Cross-company bookings) */}
+                  {item.user && (
+                    <div className="mt-2.5 flex items-center justify-between p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-6 h-6 rounded-full bg-purple-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
+                          {item.user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <span className="font-semibold text-purple-900 dark:text-purple-200 block truncate">
+                            {item.user.name}
+                          </span>
+                          <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block truncate">
+                            {item.user.email}
+                          </span>
+                        </div>
+                      </div>
+                      {item.user.department && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-300 dark:border-purple-800 shrink-0 ml-2">
+                          {item.user.department}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Time Range Badge */}
                   <div className="mt-4 rounded-xl bg-zinc-50 p-3 dark:bg-zinc-950/70 border border-zinc-100 dark:border-zinc-800 space-y-1">
@@ -559,6 +784,29 @@ export function MyReservationsClient({
                       &quot;{checkInInfo.cleanNotes}&quot;
                     </p>
                   )}
+
+                  {/* Admin Cancellation Reason Notice Box for Affected Users */}
+                  {isCancelled && cancellationInfo.isCancelledByAdmin && cancellationInfo.reason ? (
+                    <div className="mt-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 p-3.5 text-xs text-rose-900 dark:bg-rose-950/40 dark:border-rose-800/80 dark:text-rose-200">
+                      <div className="flex items-center gap-2 font-bold text-rose-800 dark:text-rose-300">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                        <span>Cancelled by Administrator {cancellationInfo.cancelledBy ? `(${cancellationInfo.cancelledBy})` : ""}</span>
+                      </div>
+                      <div className="mt-2 pl-6 space-y-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block">
+                          Reason for Cancellation:
+                        </span>
+                        <p className="text-xs font-medium text-rose-950 dark:text-rose-100 italic bg-white/80 dark:bg-zinc-900/80 p-2.5 rounded-xl border border-rose-200/80 dark:border-rose-900/60 shadow-xs">
+                          &ldquo;{cancellationInfo.reason}&rdquo;
+                        </p>
+                      </div>
+                    </div>
+                  ) : isCancelled && cancellationInfo.reason ? (
+                    <div className="mt-3 rounded-2xl bg-zinc-100 border border-zinc-200 p-3 text-xs text-zinc-700 dark:bg-zinc-800/60 dark:border-zinc-700 dark:text-zinc-300">
+                      <span className="font-semibold block text-zinc-800 dark:text-zinc-200">Cancellation Reason:</span>
+                      <p className="mt-1 italic bg-white/60 dark:bg-zinc-900/50 p-2 rounded-lg">&ldquo;{cancellationInfo.reason}&rdquo;</p>
+                    </div>
+                  ) : null}
 
                   {/* Ghost Booking Prevention Interactive Card Panel */}
                   {isCancelled && checkInInfo.isAutoReleased ? (
@@ -639,7 +887,7 @@ export function MyReservationsClient({
                       <ExternalLink className="h-3 w-3" />
                     </Link>
 
-                    {!isCancelled && (
+                    {!isCancelled && !isPast && (
                       <AddToCalendarButton
                         size="sm"
                         event={{
@@ -669,18 +917,22 @@ export function MyReservationsClient({
                       </button>
 
                       <button
-                        onClick={() => handleCancel(item)}
-                        disabled={cancellingId === item.id}
+                        onClick={() => {
+                          setReservationToCancel(item);
+                          setCancelModalOpen(true);
+                        }}
                         className="inline-flex items-center gap-1 rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 dark:bg-rose-950/60 dark:text-rose-300 transition-colors cursor-pointer"
                       >
-                        {cancellingId === item.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <XCircle className="h-3.5 w-3.5" />
-                        )}
+                        <XCircle className="h-3.5 w-3.5" />
                         <span>Cancel Booking</span>
                       </button>
                     </div>
+                  )}
+
+                  {isPast && !isCancelled && (
+                    <span className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500 flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> Past Reservation (Read-Only)
+                    </span>
                   )}
                 </div>
               </div>
@@ -696,6 +948,37 @@ export function MyReservationsClient({
         reservation={reservationToEdit}
         onSuccess={handleEditSuccess}
       />
+
+      {/* Cancel Reservation Modal */}
+      <CancelReservationModal
+        isOpen={cancelModalOpen}
+        onClose={() => {
+          setCancelModalOpen(false);
+          setReservationToCancel(null);
+        }}
+        reservation={reservationToCancel}
+        isAdmin={isAdmin}
+        currentUserId={currentUserId}
+        onSuccess={handleCancelSuccess}
+      />
+
+      {/* Admin Create Reservation Modal */}
+      {isAdmin && (
+        <AdminCreateReservationModal
+          isOpen={isAdminBookModalOpen}
+          onClose={() => setIsAdminBookModalOpen(false)}
+          onSuccess={() => {
+            setIsAdminBookModalOpen(false);
+            setStatusMessage({
+              type: "success",
+              text: "Reservation booked successfully for employee.",
+            });
+            router.refresh();
+          }}
+          users={companyUsers}
+          resources={resources}
+        />
+      )}
     </div>
   );
 }

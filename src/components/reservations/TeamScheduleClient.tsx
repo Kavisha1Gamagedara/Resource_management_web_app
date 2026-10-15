@@ -145,6 +145,7 @@ export function TeamScheduleClient({
             <Input
               type="date"
               value={selectedDate}
+              min={format(new Date(), "yyyy-MM-dd")}
               onChange={(e) => setSelectedDate(e.target.value)}
               className="text-xs h-9 bg-slate-950"
             />
@@ -224,7 +225,7 @@ export function TeamScheduleClient({
                           <XCircle className="w-3 h-3 mr-1" /> Cancelled
                         </Badge>
                       )}
-                      {isConfirmed && (
+                      {isConfirmed && new Date(res.endTime).getTime() > Date.now() && (
                         <AddToCalendarButton
                           event={{
                             id: res.id,
