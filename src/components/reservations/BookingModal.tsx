@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { format, setHours, setMinutes } from "date-fns";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -95,17 +95,27 @@ export function BookingModal({
     const effectiveStart = initialStart || initialStartTime;
     const effectiveEnd = initialEnd || initialEndTime;
 
-    if (effectiveStart && effectiveEnd) {
+    // Ensure effectiveStart is not in the past
+    const isPastStart = effectiveStart && effectiveStart.getTime() < Date.now() - 60 * 1000;
+
+    if (effectiveStart && effectiveEnd && !isPastStart) {
       setDateStr(format(effectiveStart, "yyyy-MM-dd"));
       setStartTimeStr(format(effectiveStart, "HH:mm"));
       setEndTimeStr(format(effectiveEnd, "HH:mm"));
     } else {
       const now = new Date();
-      const nextHour = Math.min(now.getHours() + 1, 22);
-      const nextHourEnd = Math.min(nextHour + 1, 23);
-      setDateStr(format(now, "yyyy-MM-dd"));
-      setStartTimeStr(`${String(nextHour).padStart(2, "0")}:00`);
-      setEndTimeStr(`${String(nextHourEnd).padStart(2, "0")}:00`);
+      if (now.getHours() >= 22) {
+        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        setDateStr(format(tomorrow, "yyyy-MM-dd"));
+        setStartTimeStr("09:00");
+        setEndTimeStr("10:00");
+      } else {
+        const nextHour = now.getHours() + 1;
+        const nextHourEnd = Math.min(nextHour + 1, 23);
+        setDateStr(format(now, "yyyy-MM-dd"));
+        setStartTimeStr(`${String(nextHour).padStart(2, "0")}:00`);
+        setEndTimeStr(`${String(nextHourEnd).padStart(2, "0")}:00`);
+      }
     }
     setTitle("");
     setNotes("");
@@ -116,6 +126,14 @@ export function BookingModal({
     setSubmitError(null);
     setConfirmedBooking(null);
   }, [initialStart, initialEnd, initialStartTime, initialEndTime, isOpen, resourceId, resourceName]);
+
+  // Check if currently selected date and time is in the past
+  const isSelectedTimePast = useMemo(() => {
+    if (!dateStr || !startTimeStr) return false;
+    const [sh, sm] = startTimeStr.split(":").map(Number);
+    const start = setMinutes(setHours(new Date(`${dateStr}T00:00:00`), sh), sm);
+    return start.getTime() < Date.now() - 60 * 1000;
+  }, [dateStr, startTimeStr]);
 
   // Story 3: Debounced Live Conflict Probing with Smart Recommendations
   useEffect(() => {
@@ -135,7 +153,8 @@ export function BookingModal({
     }
 
     if (start.getTime() < Date.now() - 60 * 1000) {
-      setConflictWarning("Cannot reserve a slot in the past. Please select an upcoming date and time.");
+      // User requested: No need to show past time conflict warning banner; just block selection
+      setConflictWarning(null);
       setSmartSuggestions(null);
       return;
     }
@@ -191,6 +210,11 @@ export function BookingModal({
 
     if (!session) {
       setSubmitError("Please sign in to reserve this resource.");
+      return;
+    }
+
+    if (isSelectedTimePast) {
+      setSubmitError("Please select an upcoming time slot.");
       return;
     }
 
@@ -449,7 +473,7 @@ export function BookingModal({
             )}
 
             {/* Success Slot Available Indicator */}
-            {!conflictWarning && !isCheckingConflict && dateStr && (
+            {!conflictWarning && !isCheckingConflict && dateStr && !isSelectedTimePast && (
               <div className="mt-4 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
                 <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                 <span>Time slot is currently available! No conflicts detected.</span>
@@ -494,31 +518,117 @@ export function BookingModal({
               </div>
 
               {/* Time Range */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                    Start Time *
-                  </label>
-                  <input
-                    type="time"
-                    required
-                    value={startTimeStr}
-                    onChange={(e) => setStartTimeStr(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
-                  />
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-teal-400" />
+                      <span>Start Time *</span>
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={startTimeStr}
+                      onChange={(e) => setStartTimeStr(e.target.value)}
+                      className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-zinc-900 outline-none focus:border-teal-500 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 shadow-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-teal-400" />
+                      <span>End Time *</span>
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={endTimeStr}
+                      onChange={(e) => setEndTimeStr(e.target.value)}
+                      className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-zinc-900 outline-none focus:border-teal-500 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 shadow-sm"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                    End Time *
-                  </label>
-                  <input
-                    type="time"
-                    required
-                    value={endTimeStr}
-                    onChange={(e) => setEndTimeStr(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 outline-none focus:border-teal-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
-                  />
+                {/* Quick Duration Shortcuts */}
+                <div className="space-y-1 pt-1">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                    <span>Quick Duration:</span>
+                    <span className="text-[10px] text-slate-500">Auto-adjusts end time</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { label: "30 min", mins: 30 },
+                      { label: "1 hr", mins: 60 },
+                      { label: "1.5 hrs", mins: 90 },
+                      { label: "2 hrs", mins: 120 },
+                      { label: "3 hrs", mins: 180 },
+                      { label: "Half Day (4h)", mins: 240 },
+                    ].map((dur) => (
+                      <button
+                        key={dur.label}
+                        type="button"
+                        onClick={() => {
+                          const [sh, sm] = startTimeStr.split(":").map(Number);
+                          const totalMins = sh * 60 + sm + dur.mins;
+                          const endH = Math.min(Math.floor(totalMins / 60), 23);
+                          const endM = totalMins % 60;
+                          setEndTimeStr(`${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`);
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 transition-colors"
+                      >
+                        {dur.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick Standard Slot Presets */}
+                <div className="space-y-1 pt-1">
+                  <span className="text-[11px] text-zinc-400">Common Time Slots:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { label: "9:00 - 10:00 AM", s: "09:00", e: "10:00" },
+                      { label: "10:00 - 11:00 AM", s: "10:00", e: "11:00" },
+                      { label: "11:00 - 12:00 PM", s: "11:00", e: "12:00" },
+                      { label: "1:00 - 2:00 PM", s: "13:00", e: "14:00" },
+                      { label: "2:00 - 3:00 PM", s: "14:00", e: "15:00" },
+                      { label: "3:00 - 4:00 PM", s: "15:00", e: "16:00" },
+                      { label: "4:00 - 5:00 PM", s: "16:00", e: "17:00" },
+                    ].map((preset) => {
+                      const todayStr = format(new Date(), "yyyy-MM-dd");
+                      const isToday = dateStr === todayStr;
+                      let isPresetPast = false;
+                      if (isToday) {
+                        const [eh, em] = preset.e.split(":").map(Number);
+                        const presetEnd = setMinutes(setHours(new Date(`${dateStr}T00:00:00`), eh), em);
+                        isPresetPast = presetEnd.getTime() <= Date.now();
+                      }
+
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          disabled={isPresetPast}
+                          onClick={() => {
+                            if (!isPresetPast) {
+                              setStartTimeStr(preset.s);
+                              setEndTimeStr(preset.e);
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-mono transition-colors ${
+                            isPresetPast
+                              ? "opacity-30 cursor-not-allowed line-through bg-zinc-900 border border-zinc-800 text-zinc-500"
+                              : startTimeStr === preset.s && endTimeStr === preset.e
+                              ? "bg-teal-500/20 text-teal-300 border border-teal-500/50 font-bold cursor-pointer"
+                              : "bg-zinc-800/60 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/40 cursor-pointer"
+                          }`}
+                          title={isPresetPast ? "Past time slot (unavailable)" : `Select ${preset.label}`}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -587,13 +697,15 @@ export function BookingModal({
 
                 <button
                   type="submit"
-                  disabled={isSubmitting || Boolean(conflictWarning) || !session}
-                  className={`flex items-center gap-2 rounded-xl px-5 py-2 font-semibold text-white shadow-sm transition-all cursor-pointer ${
-                    conflictWarning
+                  disabled={isSubmitting || Boolean(conflictWarning) || !session || isSelectedTimePast}
+                  className={`flex items-center gap-2 rounded-xl px-5 py-2 font-semibold text-white shadow-sm transition-all ${
+                    isSelectedTimePast
+                      ? "bg-zinc-700/60 text-zinc-400 cursor-not-allowed border border-zinc-700"
+                      : conflictWarning
                       ? "bg-rose-500/80 cursor-not-allowed"
                       : isPrivate && session?.user?.role !== "ADMIN"
-                      ? "bg-amber-600 hover:bg-amber-500 disabled:opacity-50"
-                      : "bg-teal-600 hover:bg-teal-500 disabled:opacity-50"
+                      ? "bg-amber-600 hover:bg-amber-500 disabled:opacity-50 cursor-pointer"
+                      : "bg-teal-600 hover:bg-teal-500 disabled:opacity-50 cursor-pointer"
                   }`}
                 >
                   {isSubmitting ? (
@@ -601,6 +713,8 @@ export function BookingModal({
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       <span>Reserving...</span>
                     </>
+                  ) : isSelectedTimePast ? (
+                    <span>Select an Upcoming Time</span>
                   ) : conflictWarning ? (
                     <span>Cannot Book (Conflict)</span>
                   ) : isPrivate && session?.user?.role !== "ADMIN" ? (

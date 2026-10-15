@@ -5,7 +5,7 @@ import { Shield, Sparkles, CheckCircle2 } from "lucide-react";
 export function Footer() {
   return (
     <footer className="mt-auto border-t border-zinc-200 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-950/70 py-8 transition-colors">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1720px] px-4 sm:px-6 lg:px-10 xl:px-12">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
             <span className="font-semibold text-zinc-900 dark:text-zinc-200">

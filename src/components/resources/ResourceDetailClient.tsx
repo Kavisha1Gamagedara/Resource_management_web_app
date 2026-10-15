@@ -71,6 +71,7 @@ export function ResourceDetailClient({ resource }: ResourceDetailClientProps) {
 
   const handleSelectSlot = (start: Date, end: Date) => {
     if (resource.status !== "ACTIVE") return;
+    if (end.getTime() <= Date.now()) return;
     setSelectedSlot({ start, end });
     setIsBookingOpen(true);
   };

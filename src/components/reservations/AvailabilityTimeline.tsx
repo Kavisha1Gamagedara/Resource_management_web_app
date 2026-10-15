@@ -67,6 +67,18 @@ export function AvailabilityTimeline({
   // Hourly slots for quick booking
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => START_HOUR + i);
 
+  const formatHourLabel = (h: number) => {
+    const period = h >= 12 ? "PM" : "AM";
+    const displayHour = h % 12 === 0 ? 12 : h % 12;
+    return `${displayHour}:00 ${period}`;
+  };
+
+  const formatShortHour = (h: number) => {
+    const period = h >= 12 ? "PM" : "AM";
+    const displayHour = h % 12 === 0 ? 12 : h % 12;
+    return `${displayHour} ${period}`;
+  };
+
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-5 backdrop-blur-md space-y-5">
       {/* Date Navigation Bar */}
@@ -116,32 +128,66 @@ export function AvailabilityTimeline({
 
           {/* Visual Timeline Bar */}
           <div className="space-y-2">
-            <div className="flex justify-between text-[11px] font-medium text-slate-400 px-1">
-              <span>08:00 AM</span>
-              <span>12:00 PM</span>
-              <span>04:00 PM</span>
-              <span>08:00 PM</span>
+            {/* Hour Markers directly above timeline segments */}
+            <div className="grid grid-cols-12 text-[10px] sm:text-xs font-semibold text-slate-300 text-center select-none pb-1">
+              {hours.map((hour) => (
+                <div key={hour} className="truncate px-0.5">
+                  <span className="hidden md:inline">{formatShortHour(hour)}</span>
+                  <span className="md:hidden">{hour > 12 ? hour - 12 : hour}{hour >= 12 ? "p" : "a"}</span>
+                </div>
+              ))}
             </div>
 
             {/* Continuous timeline bar */}
-            <div className="relative h-12 w-full bg-slate-950 rounded-lg border border-slate-800 overflow-hidden flex">
-              {/* Hour dividers */}
-              {hours.map((hour) => (
-                <div
-                  key={hour}
-                  className="flex-1 border-r border-slate-800/40 h-full relative group cursor-pointer hover:bg-emerald-500/10 transition-colors"
-                  onClick={() => {
-                    if (onSelectSlot) {
-                      const start = new Date(selectedDate);
-                      start.setHours(hour, 0, 0, 0);
-                      const end = new Date(selectedDate);
-                      end.setHours(hour + 1, 0, 0, 0);
-                      onSelectSlot(start, end);
-                    }
-                  }}
-                  title={`Click to book ${hour}:00 - ${hour + 1}:00`}
-                />
-              ))}
+            <div className="relative h-16 w-full bg-slate-950/90 rounded-xl border border-slate-700/80 overflow-hidden flex shadow-inner">
+              {/* Hour dividers & interactive hover indicators */}
+              {hours.map((hour) => {
+                const slotStart = new Date(selectedDate);
+                slotStart.setHours(hour, 0, 0, 0);
+                const slotEnd = new Date(selectedDate);
+                slotEnd.setHours(hour + 1, 0, 0, 0);
+                const isPast = slotEnd.getTime() <= Date.now();
+                const isEven = hour % 2 === 0;
+
+                if (isPast) {
+                  return (
+                    <div
+                      key={hour}
+                      className="flex-1 border-r border-slate-800/80 h-full relative cursor-not-allowed select-none transition-colors flex flex-col justify-between p-1.5 bg-slate-950/90 opacity-40"
+                      title={`Past time slot (${formatHourLabel(hour)}) - Bookings closed`}
+                    >
+                      <span className="text-[10px] font-mono text-slate-600 line-through">
+                        {hour > 12 ? hour - 12 : hour}{hour >= 12 ? "p" : "a"}
+                      </span>
+                      <span className="text-[9px] text-slate-600 font-medium">
+                        Past
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={hour}
+                    className={`flex-1 border-r border-slate-700/60 h-full relative group cursor-pointer transition-colors flex flex-col justify-between p-1.5 ${
+                      isEven ? "bg-slate-900/40" : "bg-slate-950/40"
+                    } hover:bg-emerald-500/20`}
+                    onClick={() => {
+                      if (onSelectSlot) {
+                        onSelectSlot(slotStart, slotEnd);
+                      }
+                    }}
+                    title={`Click to reserve ${formatHourLabel(hour)} – ${formatHourLabel(hour + 1)}`}
+                  >
+                    <span className="text-[10px] font-mono text-slate-500 group-hover:text-emerald-300 font-medium">
+                      {hour > 12 ? hour - 12 : hour}{hour >= 12 ? "p" : "a"}
+                    </span>
+                    <span className="text-[9px] text-emerald-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                      + Book
+                    </span>
+                  </div>
+                );
+              })}
 
               {/* Booked blocks overlays */}
               {dayReservations.map((res) => {
@@ -173,21 +219,21 @@ export function AvailabilityTimeline({
                 return (
                   <React.Fragment key={res.id}>
                     <div
-                      className="absolute top-1 bottom-1 rounded bg-rose-600/85 border border-rose-400/80 text-white px-2 py-0.5 text-xs flex items-center justify-between shadow-md overflow-hidden z-10 transition-all hover:bg-rose-500"
+                      className="absolute top-1 bottom-1 rounded-lg bg-rose-600/90 border border-rose-400/90 text-white px-2 py-0.5 text-xs flex items-center justify-between shadow-md overflow-hidden z-10 transition-all hover:bg-rose-500"
                       style={{
                         left: `${leftPercent}%`,
                         width: `${Math.max(widthPercent, 3)}%`,
                       }}
                       title={`${res.title} (${formatTime(res.startTime)} - ${formatTime(res.endTime)}) by ${res.user.name}`}
                     >
-                      <span className="truncate font-medium text-[11px] leading-tight">
+                      <span className="truncate font-semibold text-[11px] leading-tight">
                         {res.title}
                       </span>
                     </div>
 
                     {bufferMinutes > 0 && bufClampedEnd > bufClampedStart && (
                       <div
-                        className="absolute top-1.5 bottom-1.5 rounded bg-amber-500/25 border border-dashed border-amber-400/80 text-amber-300 px-1 py-0.5 text-[10px] flex items-center justify-center font-medium overflow-hidden z-10 select-none shadow-sm"
+                        className="absolute top-1.5 bottom-1.5 rounded-lg bg-amber-500/25 border border-dashed border-amber-400/80 text-amber-300 px-1 py-0.5 text-[10px] flex items-center justify-center font-medium overflow-hidden z-10 select-none shadow-sm"
                         style={{
                           left: `${bufLeftPercent}%`,
                           width: `${Math.max(bufWidthPercent, 2)}%`,
@@ -203,21 +249,168 @@ export function AvailabilityTimeline({
             </div>
 
             {/* Timeline Legend */}
-            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400 pt-1">
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded bg-slate-950 border border-slate-700" />
-                <span>Available Slot</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded bg-rose-600/85 border border-rose-400/80" />
-                <span>Booked Reservation</span>
-              </div>
-              {bufferMinutes > 0 && (
-                <div className="flex items-center gap-1.5 text-amber-300 font-medium">
-                  <span className="w-3 h-3 rounded bg-amber-500/25 border border-dashed border-amber-400/80" />
-                  <span>🧹 {bufferMinutes}m Turnaround / Cleaning</span>
+            <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400 pt-1">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-slate-900 border border-slate-700" />
+                  <span className="text-slate-300">Available Slot</span>
                 </div>
-              )}
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-rose-600/90 border border-rose-400/90" />
+                  <span className="text-rose-300 font-medium">Booked Reservation</span>
+                </div>
+                {bufferMinutes > 0 && (
+                  <div className="flex items-center gap-1.5 text-amber-300 font-medium">
+                    <span className="w-3 h-3 rounded bg-amber-500/25 border border-dashed border-amber-400/80" />
+                    <span>🧹 {bufferMinutes}m Turnaround Buffer</span>
+                  </div>
+                )}
+              </div>
+              <span className="text-[11px] text-slate-500 hidden sm:inline">
+                Hover or click any slot to begin a booking
+              </span>
+            </div>
+          </div>
+
+          {/* Hourly Availability Slots Grid */}
+          <div className="space-y-3 pt-4 border-t border-slate-800/80">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-emerald-400" />
+                <h5 className="text-xs sm:text-sm font-bold tracking-tight text-white">
+                  Daily Time Slots Overview ({format(selectedDate, "EEE, MMM d")})
+                </h5>
+              </div>
+              <span className="text-[11px] text-slate-400">
+                Click any <span className="text-emerald-400 font-semibold">Available</span> card to pre-fill reservation time
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+              {hours.map((hour) => {
+                const slotStart = new Date(selectedDate);
+                slotStart.setHours(hour, 0, 0, 0);
+                const slotEnd = new Date(selectedDate);
+                slotEnd.setHours(hour + 1, 0, 0, 0);
+                const isPast = slotEnd.getTime() <= Date.now();
+
+                if (isPast) {
+                  return (
+                    <div
+                      key={hour}
+                      className="p-3 rounded-xl border border-slate-800/60 bg-slate-950/80 text-left opacity-35 cursor-not-allowed select-none flex flex-col justify-between min-h-[76px]"
+                      title={`Past time slot (${formatHourLabel(hour)} – ${formatHourLabel(hour + 1)})`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-slate-500 font-mono line-through">
+                          {formatShortHour(hour)}
+                        </span>
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-900 text-slate-500 border border-slate-800">
+                          Past
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-[11px] text-slate-600">
+                        <span>Slot Closed</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Check if slot overlaps with any confirmed reservation
+                const bookedRes = dayReservations.find((r) => {
+                  const rStart = new Date(r.startTime);
+                  const rEnd = new Date(r.endTime);
+                  return rStart < slotEnd && rEnd > slotStart;
+                });
+
+                // Check if slot overlaps with any turnaround buffer
+                const bufferRes = !bookedRes && bufferMinutes > 0 ? dayReservations.find((r) => {
+                  const rEnd = new Date(r.endTime);
+                  const bufEnd = new Date(rEnd.getTime() + bufferMinutes * 60 * 1000);
+                  return rEnd < slotEnd && bufEnd > slotStart;
+                }) : null;
+
+                const isBooked = Boolean(bookedRes);
+                const isBuffer = Boolean(bufferRes);
+
+                const startFormatted = formatHourLabel(hour);
+                const endFormatted = formatHourLabel(hour + 1);
+
+                if (isBooked && bookedRes) {
+                  return (
+                    <div
+                      key={hour}
+                      className="p-3 rounded-xl border border-rose-500/30 bg-rose-950/20 text-left transition-all flex flex-col justify-between min-h-[76px]"
+                      title={`Booked: ${bookedRes.title} (${formatTime(bookedRes.startTime)} - ${formatTime(bookedRes.endTime)})`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-rose-200 font-mono">
+                          {formatShortHour(hour)}
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-950 border border-rose-800 text-rose-300 uppercase">
+                          Booked
+                        </span>
+                      </div>
+                      <div className="mt-1">
+                        <div className="text-[11px] font-semibold text-rose-200 truncate">
+                          {bookedRes.title}
+                        </div>
+                        <div className="text-[10px] text-slate-400 truncate">
+                          {bookedRes.user?.name || "Team Member"}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (isBuffer) {
+                  return (
+                    <div
+                      key={hour}
+                      className="p-3 rounded-xl border border-amber-500/30 bg-amber-950/20 text-left flex flex-col justify-between min-h-[76px]"
+                      title={`🧹 ${bufferMinutes}-minute turnaround cleaning & reset window`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-amber-200 font-mono">
+                          {formatShortHour(hour)}
+                        </span>
+                        <span className="text-xs">🧹</span>
+                      </div>
+                      <div className="mt-1">
+                        <div className="text-[11px] font-semibold text-amber-300">
+                          {bufferMinutes}m Turnaround
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          Cleaning & Reset
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <button
+                    key={hour}
+                    type="button"
+                    onClick={() => onSelectSlot && onSelectSlot(slotStart, slotEnd)}
+                    className="p-3 rounded-xl border border-emerald-500/40 bg-emerald-950/20 hover:bg-emerald-900/30 hover:border-emerald-400 text-left transition-all duration-150 group cursor-pointer shadow-sm hover:shadow-emerald-950/50 flex flex-col justify-between min-h-[76px]"
+                    title={`Click to reserve ${startFormatted} – ${endFormatted}`}
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-xs font-bold text-white group-hover:text-emerald-300 font-mono">
+                        {formatShortHour(hour)}
+                      </span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    </div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="text-[11px] text-emerald-400 font-medium">Available</span>
+                      <span className="text-emerald-300 font-bold text-[10px] group-hover:translate-x-0.5 transition-transform">
+                        + Book →
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
